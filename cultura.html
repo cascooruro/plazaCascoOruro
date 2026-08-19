@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Cultura - Oruro</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- IMPORT MAP PARA THREE.JS -->
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    background:#061430;
+    color:#fff;
+    overflow-x:hidden;
+}
+
+/* HEADER */
+header{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    background:#051029;
+    z-index:1000;
+}
+
+.navbar{
+    width:90%;
+    margin:auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:20px 0;
+}
+
+.logo{
+    display:flex;
+    align-items:center;
+    gap:15px;
+}
+
+.logo-box{
+    width:70px;
+    height:70px;
+    background:#F2B71D;
+    border-radius:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#000;
+    font-size:40px;
+    font-weight:bold;
+}
+
+.logo h2{
+    font-size:22px;
+}
+
+.menu{
+    display:flex;
+    gap:40px;
+    list-style:none;
+}
+
+.menu a{
+    text-decoration:none;
+    color:#fff;
+    font-weight:600;
+}
+
+.menu a:hover,
+.menu a.active{
+    color:#F2B71D;
+}
+
+.btn-login{
+    padding:15px 35px;
+    border:1px solid rgba(255,255,255,.25);
+    border-radius:40px;
+    color:#fff;
+    text-decoration:none;
+}
+
+/* SECCIONES */
+.hero{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:60px;
+    padding:140px 8% 80px;
+}
+
+/* CONTENEDORES PARA CADA MODELO 3D */
+.modelo3d-box{
+    width:100%;
+    max-width:550px;
+    height:420px;
+    border-radius:30px;
+    background:rgba(255, 255, 255, 0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    box-shadow:0 10px 30px rgba(0,0,0,.4);
+    overflow:hidden;
+    cursor:grab;
+}
+
+.modelo3d-box:active{
+    cursor:grabbing;
+}
+
+.modelo3d-box canvas{
+    width:100% !important;
+    height:100% !important;
+    display:block;
+}
+
+.content{
+    max-width:600px;
+}
+
+.content span{
+    color:#F2B71D;
+    font-size:22px;
+    font-weight:600;
+}
+
+.content h1{
+    font-size:70px;
+    margin:15px 0;
+    line-height:1;
+}
+
+.content p{
+    font-size:20px;
+    line-height:1.8;
+    color:#E8EDF5;
+}
+
+.btn{
+    display:inline-block;
+    margin-top:30px;
+    padding:18px 45px;
+    background:#F2B71D;
+    color:#000;
+    text-decoration:none;
+    border-radius:15px;
+    font-weight:700;
+}
+
+/* TABLET */
+@media(max-width:1100px){
+
+    .menu{
+        display:none;
+    }
+
+    .hero{
+        flex-direction:column;
+        text-align:center;
+        gap:30px;
+        padding:120px 30px 60px;
+    }
+
+    .content h1{
+        font-size:50px;
+    }
+
+    .modelo3d-box{
+        height:350px;
+    }
+}
+
+/* CELULAR */
+@media(max-width:600px){
+
+    .navbar{
+        width:95%;
+        padding:15px 0;
+    }
+
+    .logo-box{
+        width:50px;
+        height:50px;
+        font-size:28px;
+    }
+
+    .logo h2{
+        font-size:18px;
+    }
+
+    .btn-login{
+        padding:10px 18px;
+        font-size:13px;
+    }
+
+    .hero{
+        flex-direction:column;
+        text-align:center;
+        padding:100px 15px 40px;
+        gap:20px;
+    }
+
+    .modelo3d-box{
+        width:100%;
+        max-width:320px;
+        height:280px;
+        border-radius:20px;
+    }
+
+    .content{
+        width:100%;
+    }
+
+    .content span{
+        font-size:18px;
+    }
+
+    .content h1{
+        font-size:32px;
+    }
+
+    .content p{
+        font-size:15px;
+        line-height:1.7;
+    }
+
+    .btn{
+        width:100%;
+        max-width:250px;
+        text-align:center;
+        padding:15px;
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<nav class="navbar">
+
+<div class="logo">
+<div class="logo-box">O</div>
+<h2>ORURO</h2>
+</div>
+
+<ul class="menu">
+<li><a href="index.html">INICIO</a></li>
+<li><a href="historia.html">HISTORIA</a></li>
+<li><a href="cultura.html" class="active">CULTURA</a></li>
+</ul>
+
+</nav>
+</header>
+
+<!-- SECCIÓN EL SAPO -->
+<section class="hero">
+<div id="canvas-sapo" class="modelo3d-box"></div>
+<div class="content">
+<span>Cultura</span>
+<h1>EL SAPO</h1>
+<p>El Sapo es uno de los personajes más importantes de la leyenda de Oruro. Según la tradición, fue enviado por Huari para destruir a los Urus, pero la Virgen del Socavón lo convirtió en piedra.</p>
+<a href="#" class="btn">Leer más</a>
+</div>
+</section>
+
+<!-- SECCIÓN LA VÍBORA -->
+<section class="hero">
+<div id="canvas-vibora" class="modelo3d-box"></div>
+<div class="content">
+<span>Cultura</span>
+<h1>LA VÍBORA</h1>
+<p>La Víbora fue enviada por Huari como castigo para los antiguos habitantes de la región. Según la leyenda, fue derrotada gracias a la protección de la Virgen del Socavón.</p>
+<a href="#" class="btn">Leer más</a>
+</div>
+</section>
+
+<!-- SECCIÓN LA HORMIGA -->
+<section class="hero">
+<div id="canvas-hormiga" class="modelo3d-box"></div>
+<div class="content">
+<span>Cultura</span>
+<h1>LA HORMIGA</h1>
+<p>Las hormigas gigantes forman parte de la leyenda de Huari y representan una de las amenazas enviadas contra los antiguos Urus.</p>
+<a href="#" class="btn">Leer más</a>
+</div>
+</section>
+
+<!-- ==========================================
+     LÓGICA DE CARGA THREE.JS
+========================================== -->
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+function crearEscena3D(idContenedor, rutaModelo, escalaBase = 4) {
+    const contenedor = document.getElementById(idContenedor);
+    if (!contenedor) return;
+
+    const escena = new THREE.Scene();
+    const camara = new THREE.PerspectiveCamera(45, contenedor.clientWidth / contenedor.clientHeight, 0.1, 1000);
+    camara.position.set(0, 1.5, 5);
+
+    const renderizador = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderizador.setSize(contenedor.clientWidth, contenedor.clientHeight);
+    renderizador.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderizador.outputColorSpace = THREE.SRGBColorSpace;
+    contenedor.appendChild(renderizador.domElement);
+
+    const controles = new OrbitControls(camara, renderizador.domElement);
+    controles.enableDamping = true;
+    controles.dampingFactor = 0.05;
+    controles.enableZoom = false; // Desactivado para no entorpecer el scroll de la página
+
+    // Iluminación
+    const luzAmbiente = new THREE.AmbientLight(0xffffff, 2.5);
+    escena.add(luzAmbiente);
+
+    const luzDireccional = new THREE.DirectionalLight(0xffffff, 3);
+    luzDireccional.position.set(5, 8, 5);
+    escena.add(luzDireccional);
+
+    const luzDorada = new THREE.PointLight(0xffd700, 3, 10);
+    luzDorada.position.set(0, 2, 3);
+    escena.add(luzDorada);
+
+    let contenedorModelo = null;
+    const cargador = new GLTFLoader();
+
+    cargador.load(
+        rutaModelo,
+        (gltf) => {
+            const modelo = gltf.scene;
+
+            // Centrar modelo
+            const caja = new THREE.Box3().setFromObject(modelo);
+            const centro = caja.getCenter(new THREE.Vector3());
+            const tamaño = caja.getSize(new THREE.Vector3());
+
+            modelo.position.sub(centro);
+
+            contenedorModelo = new THREE.Group();
+            contenedorModelo.add(modelo);
+
+            const tamañoMaximo = Math.max(tamaño.x, tamaño.y, tamaño.z);
+            const escala = escalaBase / tamañoMaximo;
+            contenedorModelo.scale.setScalar(escala);
+
+            escena.add(contenedorModelo);
+        },
+        undefined,
+        (error) => {
+            console.error(`Error al cargar el modelo ${rutaModelo}:`, error);
+        }
+    );
+
+    // Bucle de animación
+    function animar() {
+        requestAnimationFrame(animar);
+
+        if (contenedorModelo) {
+            contenedorModelo.rotation.y += 0.005; // Giro suave continuo
+        }
+
+        controles.update();
+        renderizador.render(escena, camara);
+    }
+    animar();
+
+    // Redimensionado dinámico
+    window.addEventListener('resize', () => {
+        camara.aspect = contenedor.clientWidth / contenedor.clientHeight;
+        camara.updateProjectionMatrix();
+        renderizador.setSize(contenedor.clientWidth, contenedor.clientHeight);
+    });
+}
+
+// Cargar cada figura 3D en su respectivo contenedor
+crearEscena3D("canvas-sapo", "sapo4.glb", 4);
+crearEscena3D("canvas-vibora", "serpiente2.glb", 4);
+crearEscena3D("canvas-hormiga", "hormiga.glb", 4);
+</script>
+
+</body>
+</html>
