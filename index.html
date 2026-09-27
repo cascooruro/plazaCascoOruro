@@ -1,0 +1,935 @@
+
+
+Inicio · HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gobierno Autónomo Municipal de Oruro</title>
+ 
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+ 
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+ 
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+ 
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+        }
+ 
+        body {
+            overflow: hidden;
+            background: #0b1d3a url("imagen de fondo.png") center center / cover no-repeat fixed;
+        }
+ 
+        #modelo3d {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+ 
+        #modelo3d canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+ 
+        #oscuro {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background: rgba(10, 25, 50, 0.25);
+            pointer-events: none;
+        }
+ 
+        /* Pantalla de carga */
+        #pantalla-carga {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background:
+                linear-gradient(rgba(3, 20, 42, 0.88), rgba(3, 20, 42, 0.94)),
+                url("imagen de fondo.png") center center / cover no-repeat;
+            color: white;
+            text-align: center;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.7s ease, visibility 0.7s ease;
+        }
+ 
+        #pantalla-carga.oculta {
+            opacity: 0;
+            visibility: hidden;
+        }
+ 
+        .carga-contenido {
+            width: min(380px, 85vw);
+        }
+ 
+        .carga-logo {
+            margin-bottom: 10px;
+            color: #f5bd32;
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: 5px;
+            text-shadow: 0 0 18px rgba(245, 189, 50, 0.4);
+        }
+ 
+        .carga-mensaje {
+            margin-bottom: 25px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+ 
+        .carga-porcentaje {
+            margin-bottom: 12px;
+            font-size: 52px;
+            font-weight: 800;
+            line-height: 1;
+        }
+ 
+        .carga-porcentaje span:last-child {
+            color: #f5bd32;
+        }
+ 
+        .carga-barra {
+            width: 100%;
+            height: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.12);
+        }
+ 
+        #carga-progreso {
+            width: 1%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #f5b400, #ffe17a);
+            box-shadow: 0 0 15px rgba(245, 180, 0, 0.7);
+            transition: width 0.08s linear;
+        }
+ 
+        .navbar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            min-height: 76px;
+            padding: 9px 4%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(3, 25, 51, 0.78);
+            border-bottom: 2px solid rgba(45, 180, 255, 0.75);
+            box-shadow: 0 4px 20px rgba(0, 150, 255, 0.25);
+            z-index: 10;
+        }
+ 
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: white;
+        }
+ 
+        .logo a {
+            display: flex;
+        }
+ 
+        .logo img {
+            width: 55px;
+            height: 55px;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+ 
+        .logo h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+ 
+        .menu {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+ 
+        .menu a {
+            color: white;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+ 
+        .menu a:hover {
+            color: #ffd24a;
+        }
+ 
+        .contenido {
+            position: absolute;
+            top: 53%;
+            left: 2.5%;
+            transform: translateY(-50%);
+            width: min(44%, 540px);
+            text-align: left;
+            color: white;
+            z-index: 5;
+            animation: aparecer 1s ease both;
+        }
+ 
+        .contenido h3 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            color: #f5bd32;
+            font-size: clamp(18px, 2.2vw, 25px);
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        }
+ 
+        .contenido h3::before {
+            content: "";
+            display: inline-block;
+            width: 40px;
+            height: 3px;
+            background: #f5bd32;
+        }
+ 
+        .contenido h1 {
+            font-size: clamp(44px, 5.4vw, 72px);
+            line-height: 1.02;
+            font-weight: 800;
+            text-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
+        }
+ 
+        .contenido h1 .acento {
+            color: #f5bd32;
+        }
+ 
+        .contenido p {
+            max-width: 390px;
+            margin-top: 14px;
+            font-size: clamp(14px, 1.5vw, 18px);
+            line-height: 1.45;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+        }
+ 
+        .botones {
+            margin-top: 24px;
+            display: flex;
+            justify-content: flex-start;
+        }
+ 
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 24px;
+            border: none;
+            border-radius: 50px;
+            background: #f5b400;
+            color: #111;
+            font-size: 16px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+ 
+        .btn:hover {
+            background: #ffca28;
+            transform: translateY(-3px);
+        }
+ 
+        #guia-teclado {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 20;
+            padding: 14px 22px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(10, 25, 50, 0.85);
+            color: white;
+            font-size: 14px;
+            backdrop-filter: blur(6px);
+        }
+ 
+        #pantalla-pausa {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(10, 20, 40, 0.85);
+            color: white;
+            text-align: center;
+        }
+ 
+        #pantalla-pausa h2 {
+            margin-bottom: 20px;
+            color: #ffd700;
+            font-size: 40px;
+        }
+ 
+        #pantalla-pausa button {
+            padding: 10px 30px;
+            border: none;
+            border-radius: 30px;
+            background: white;
+            color: black;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+ 
+        @keyframes aparecer {
+            from {
+                opacity: 0;
+                transform: translateY(calc(-50% + 20px));
+            }
+ 
+            to {
+                opacity: 1;
+                transform: translateY(-50%);
+            }
+        }
+ 
+        /* --- Panel de información al acercarse a un objeto 3D --- */
+        #panel-info-objeto {
+            position: fixed;
+            left: 50%;
+            bottom: 40px;
+            transform: translate(-50%, 20px);
+            z-index: 25;
+            width: min(480px, 88vw);
+            padding: 20px 26px;
+            border-radius: 16px;
+            background: rgba(8, 22, 46, 0.88);
+            border: 1px solid rgba(245, 189, 50, 0.55);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+            color: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+ 
+        #panel-info-objeto.visible {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+ 
+        #panel-info-objeto h4 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            color: #f5bd32;
+            font-size: 18px;
+            font-weight: 700;
+        }
+ 
+        #panel-info-objeto p {
+            font-size: 14px;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.9);
+        }
+ 
+        #pista-interaccion {
+            position: fixed;
+            left: 50%;
+            bottom: 40px;
+            transform: translateX(-50%);
+            z-index: 24;
+            padding: 8px 18px;
+            border-radius: 30px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #ffd24a;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+ 
+        #pista-interaccion.visible {
+            opacity: 1;
+        }
+ 
+        @media (max-width: 900px) {
+            .navbar {
+                padding-right: 3%;
+                padding-left: 3%;
+            }
+ 
+            .menu {
+                gap: 18px;
+            }
+ 
+            .contenido {
+                width: 46%;
+            }
+ 
+            .contenido h1 {
+                font-size: clamp(40px, 6vw, 58px);
+            }
+        }
+ 
+        @media (max-width: 650px) {
+            .navbar {
+                min-height: 68px;
+                padding: 8px 4%;
+            }
+ 
+            .logo {
+                gap: 8px;
+            }
+ 
+            .logo img {
+                width: 42px;
+                height: 42px;
+            }
+ 
+            .logo h2 {
+                font-size: 1.3rem;
+            }
+ 
+            .menu {
+                gap: 10px;
+            }
+ 
+            .menu a {
+                font-size: 11px;
+            }
+ 
+            .contenido {
+                top: 42%;
+                left: 5%;
+                width: 78%;
+            }
+ 
+            .contenido h3 {
+                font-size: 17px;
+            }
+ 
+            .contenido h1 {
+                font-size: clamp(35px, 9vw, 50px);
+            }
+ 
+            .contenido p {
+                max-width: 280px;
+                font-size: 14px;
+            }
+ 
+            .btn {
+                padding: 11px 19px;
+                font-size: 14px;
+            }
+ 
+            #pantalla-pausa h2 {
+                font-size: 30px;
+            }
+ 
+            #panel-info-objeto {
+                bottom: 20px;
+                padding: 16px 20px;
+            }
+ 
+            #pista-interaccion {
+                bottom: 20px;
+            }
+        }
+    </style>
+</head>
+ 
+<body>
+ 
+<div id="pantalla-carga">
+    <div class="carga-contenido">
+        <div class="carga-logo">ORURO</div>
+        <p class="carga-mensaje">Preparando la experiencia...</p>
+        <div class="carga-porcentaje">
+            <span id="numero-carga">1</span><span>%</span>
+        </div>
+        <div class="carga-barra">
+            <div id="carga-progreso"></div>
+        </div>
+    </div>
+</div>
+ 
+<div id="modelo3d"></div>
+<div id="oscuro"></div>
+ 
+<nav class="navbar" id="navbar">
+    <div class="logo">
+        <a href="inicio.html">
+            <img src="casco.png" alt="Logo Oruro">
+        </a>
+        <h2>ORURO</h2>
+    </div>
+ 
+    <div class="menu">
+        <a href="index.html">INICIO</a>
+        <a href="cultura.html">CULTURA</a>
+    </div>
+</nav>
+ 
+<div class="contenido" id="contenido">
+    <h3>Patrimonio Histórico</h3>
+    <h1>
+        MONUMENTO<br>
+        <span class="acento">AL CASCO</span><br>
+        DEL MINERO
+    </h1>
+    <p>
+        Símbolo de la identidad minera de Oruro,<br>
+        orgullo de todo un pueblo.
+    </p>
+    <div class="botones">
+        <button id="btn-explorar" class="btn">
+            Entrar a explorar <span aria-hidden="true">➜</span>
+        </button>
+    </div>
+</div>
+ 
+<div id="guia-teclado">
+    🚶‍♂️ <b>WASD:</b> Caminar<br>
+    🖱️ <b>Mouse:</b> Girar cabeza / Elevar vista<br>
+    ❌ <b>ESC:</b> Pausar / Salir
+</div>
+ 
+<div id="pista-interaccion">Presiona <b>E</b> para ver información</div>
+ 
+<div id="panel-info-objeto">
+    <h4>ℹ️ <span id="panel-info-titulo">Monumento al Casco del Minero</span></h4>
+    <p id="panel-info-texto">
+        Este monumento rinde homenaje al trabajador minero de Oruro,
+        pilar histórico y económico de la región. Representa el sacrificio,
+        la fuerza y la identidad cultural del pueblo minero boliviano.
+    </p>
+</div>
+ 
+<div id="pantalla-pausa">
+    <h2>EXPLORACIÓN PAUSADA</h2>
+    <p style="margin-bottom: 20px;">
+        Haz clic para continuar explorando, o vuelve al menú.
+    </p>
+    <div style="display: flex; gap: 15px;">
+        <button id="btn-continuar" style="background:#f5b400;">
+            Continuar explorando
+        </button>
+        <button id="btn-salir">Volver al Menú</button>
+    </div>
+</div>
+ 
+<script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+ 
+    const pantallaCarga = document.getElementById("pantalla-carga");
+    const numeroCarga = document.getElementById("numero-carga");
+    const barraCarga = document.getElementById("carga-progreso");
+ 
+    let porcentajeCarga = 1;
+    let recursosPendientes = 4;
+    let recursosListos = false;
+    let pantallaOculta = false;
+ 
+    function actualizarVisualCarga() {
+        numeroCarga.textContent = porcentajeCarga;
+        barraCarga.style.width = `${porcentajeCarga}%`;
+    }
+ 
+    function ocultarPantallaCarga() {
+        if (pantallaOculta || porcentajeCarga < 100 || !recursosListos) return;
+ 
+        pantallaOculta = true;
+        clearInterval(intervaloCarga);
+ 
+        setTimeout(() => {
+            pantallaCarga.classList.add("oculta");
+        }, 400);
+    }
+ 
+    const intervaloCarga = setInterval(() => {
+        if (porcentajeCarga < 99 || recursosListos) {
+            porcentajeCarga++;
+            actualizarVisualCarga();
+        }
+ 
+        ocultarPantallaCarga();
+    }, 25);
+ 
+    function recursoCargado() {
+        if (recursosPendientes <= 0) return;
+ 
+        recursosPendientes--;
+ 
+        if (recursosPendientes === 0) {
+            recursosListos = true;
+        }
+    }
+ 
+    function precargarImagen(ruta) {
+        return new Promise((resolver) => {
+            const imagen = new Image();
+ 
+            imagen.onload = resolver;
+            imagen.onerror = resolver;
+            imagen.src = ruta;
+        });
+    }
+ 
+    precargarImagen("imagen de fondo.png").then(recursoCargado);
+    precargarImagen("casco.png").then(recursoCargado);
+ 
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(recursoCargado, recursoCargado);
+    } else {
+        recursoCargado();
+    }
+ 
+    const contenedor = document.getElementById("modelo3d");
+    const escena = new THREE.Scene();
+ 
+    const colorCielo = 0x0f2b48;
+    escena.background = null;
+    escena.fog = new THREE.FogExp2(colorCielo, 0.006);
+ 
+    // Altura de la cámara cuando entras a explorar.
+    const ALTURA_SUELO = 1.7;
+    const POSICION_MODELO_X = window.innerWidth <= 650 ? 0.7 : 2.5;
+ 
+    const camara = new THREE.PerspectiveCamera(
+        50,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+    );
+ 
+    camara.position.set(0, 4.2, 11);
+    camara.lookAt(0, 1.5, 0);
+ 
+    const renderizador = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true
+    });
+ 
+    renderizador.setClearColor(0x000000, 0);
+    renderizador.setSize(window.innerWidth, window.innerHeight);
+    renderizador.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderizador.outputColorSpace = THREE.SRGBColorSpace;
+    contenedor.appendChild(renderizador.domElement);
+ 
+    // Se mantiene el modelo 3D; no se agrega el piso azul ni la cuadrícula.
+ 
+    const controles = new PointerLockControls(camara, document.body);
+    const teclas = { w: false, s: false, a: false, d: false };
+ 
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "KeyW" || e.code === "ArrowUp") teclas.w = true;
+        if (e.code === "KeyS" || e.code === "ArrowDown") teclas.s = true;
+        if (e.code === "KeyA" || e.code === "ArrowLeft") teclas.a = true;
+        if (e.code === "KeyD" || e.code === "ArrowRight") teclas.d = true;
+ 
+        // Interacción con el objeto 3D: tecla E
+        if (e.code === "KeyE" && explorando && cercaDelObjeto) {
+            alternarPanelInfo();
+        }
+    });
+ 
+    window.addEventListener("keyup", (e) => {
+        if (e.code === "KeyW" || e.code === "ArrowUp") teclas.w = false;
+        if (e.code === "KeyS" || e.code === "ArrowDown") teclas.s = false;
+        if (e.code === "KeyA" || e.code === "ArrowLeft") teclas.a = false;
+        if (e.code === "KeyD" || e.code === "ArrowRight") teclas.d = false;
+    });
+ 
+    const cantidadParticulas = 600;
+    const geometriaParticulas = new THREE.BufferGeometry();
+    const posiciones = new Float32Array(cantidadParticulas * 3);
+ 
+    for (let i = 0; i < cantidadParticulas * 3; i += 3) {
+        posiciones[i] = (Math.random() - 0.5) * 60;
+        posiciones[i + 1] = Math.random() * 25;
+        posiciones[i + 2] = (Math.random() - 0.5) * 60;
+    }
+ 
+    geometriaParticulas.setAttribute(
+        'position',
+        new THREE.BufferAttribute(posiciones, 3)
+    );
+ 
+    const materialParticulas = new THREE.PointsMaterial({
+        color: 0xffd700,
+        size: 0.05,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+    });
+ 
+    const sistemaParticulas = new THREE.Points(
+        geometriaParticulas,
+        materialParticulas
+    );
+    escena.add(sistemaParticulas);
+ 
+    const luzAmbiente = new THREE.AmbientLight(0xffffff, 2.0);
+    escena.add(luzAmbiente);
+ 
+    const luzPrincipal = new THREE.DirectionalLight(0xfffaed, 3.5);
+    luzPrincipal.position.set(10, 20, 10);
+    escena.add(luzPrincipal);
+ 
+    const luzDorada = new THREE.PointLight(0xffc107, 8, 25);
+    luzDorada.position.set(0, 4, 3);
+    escena.add(luzDorada);
+ 
+    let contenedorCasco = null;
+    let escalaBaseModelo = 1;
+ 
+    function ajustarModelo() {
+        if (!contenedorCasco) return;
+ 
+        const esMovil = window.innerWidth <= 650;
+        const esTablet = window.innerWidth <= 900;
+ 
+        const posicionX = esMovil ? 0.7 : esTablet ? 1.8 : 2.5;
+        const factorEscala = esMovil ? 0.72 : esTablet ? 0.88 : 1;
+ 
+        contenedorCasco.position.x = posicionX;
+        contenedorCasco.scale.setScalar(escalaBaseModelo * factorEscala);
+    }
+ 
+    const cargador = new GLTFLoader();
+ 
+    cargador.load(
+        "trabajo3.glb",
+        function(modelo) {
+            const casco = modelo.scene;
+ 
+            const caja = new THREE.Box3().setFromObject(casco);
+            const centro = caja.getCenter(new THREE.Vector3());
+            const tamaño = caja.getSize(new THREE.Vector3());
+ 
+            casco.position.x = -centro.x;
+            casco.position.y = -caja.min.y;
+            casco.position.z = -centro.z;
+ 
+            contenedorCasco = new THREE.Group();
+            contenedorCasco.add(casco);
+ 
+            const tamañoDeseado = 12;
+            const tamañoMaximo = Math.max(tamaño.x, tamaño.y, tamaño.z);
+            escalaBaseModelo = tamañoDeseado / tamañoMaximo;
+ 
+            contenedorCasco.scale.setScalar(escalaBaseModelo);
+            contenedorCasco.position.set(POSICION_MODELO_X, 0, 0);
+            contenedorCasco.rotation.y = Math.PI * 0.28;
+ 
+            escena.add(contenedorCasco);
+            ajustarModelo();
+ 
+            recursoCargado();
+        },
+        undefined,
+        function(error) {
+            console.error("No se pudo cargar trabajo3.glb:", error);
+            recursoCargado();
+        }
+    );
+ 
+    const btnExplorar = document.getElementById("btn-explorar");
+    const btnContinuar = document.getElementById("btn-continuar");
+    const btnSalir = document.getElementById("btn-salir");
+    const guiaTeclado = document.getElementById("guia-teclado");
+    const contenido = document.getElementById("contenido");
+    const navbar = document.getElementById("navbar");
+    const oscuro = document.getElementById("oscuro");
+    const pantallaPausa = document.getElementById("pantalla-pausa");
+    const pistaInteraccion = document.getElementById("pista-interaccion");
+    const panelInfoObjeto = document.getElementById("panel-info-objeto");
+ 
+    let explorando = false;
+ 
+    // --- Lógica de proximidad al objeto 3D (el casco) ---
+    const DISTANCIA_INTERACCION = 6; // unidades de three.js para activar la pista
+    let cercaDelObjeto = false;
+    let panelAbierto = false;
+ 
+    function alternarPanelInfo() {
+        panelAbierto = !panelAbierto;
+        panelInfoObjeto.classList.toggle("visible", panelAbierto);
+    }
+ 
+    function cerrarPanelInfo() {
+        panelAbierto = false;
+        panelInfoObjeto.classList.remove("visible");
+    }
+ 
+    function actualizarProximidad() {
+        if (!contenedorCasco || !explorando) {
+            if (cercaDelObjeto) {
+                cercaDelObjeto = false;
+                pistaInteraccion.classList.remove("visible");
+                cerrarPanelInfo();
+            }
+            return;
+        }
+ 
+        const posicionObjeto = new THREE.Vector3();
+        contenedorCasco.getWorldPosition(posicionObjeto);
+        // Comparamos solo en el plano horizontal (X, Z) para que la altura de la cámara no afecte la distancia.
+        const dx = camara.position.x - posicionObjeto.x;
+        const dz = camara.position.z - posicionObjeto.z;
+        const distancia = Math.sqrt(dx * dx + dz * dz);
+ 
+        const estaCerca = distancia <= DISTANCIA_INTERACCION;
+ 
+        if (estaCerca && !cercaDelObjeto) {
+            cercaDelObjeto = true;
+            pistaInteraccion.classList.add("visible");
+        } else if (!estaCerca && cercaDelObjeto) {
+            cercaDelObjeto = false;
+            pistaInteraccion.classList.remove("visible");
+            cerrarPanelInfo();
+        }
+    }
+ 
+    btnExplorar.addEventListener("click", () => {
+        const posicionX = contenedorCasco
+            ? contenedorCasco.position.x
+            : POSICION_MODELO_X;
+ 
+        camara.position.set(posicionX, ALTURA_SUELO, 11);
+        camara.lookAt(posicionX, ALTURA_SUELO, 0);
+        controles.lock();
+    });
+ 
+    btnContinuar.addEventListener("click", () => {
+        controles.lock();
+    });
+ 
+    controles.addEventListener('lock', () => {
+        explorando = true;
+        camara.position.y = ALTURA_SUELO;
+        contenido.style.display = "none";
+        navbar.style.display = "none";
+        oscuro.style.display = "none";
+        pantallaPausa.style.display = "none";
+        guiaTeclado.style.display = "block";
+    });
+ 
+    controles.addEventListener('unlock', () => {
+        if (explorando) {
+            pantallaPausa.style.display = "flex";
+            guiaTeclado.style.display = "none";
+            pistaInteraccion.classList.remove("visible");
+            cerrarPanelInfo();
+        }
+    });
+ 
+    btnSalir.addEventListener("click", () => {
+        explorando = false;
+        pantallaPausa.style.display = "none";
+        contenido.style.display = "block";
+        navbar.style.display = "flex";
+        oscuro.style.display = "block";
+        pistaInteraccion.classList.remove("visible");
+        cerrarPanelInfo();
+        cercaDelObjeto = false;
+ 
+        camara.position.set(0, 4.2, 11);
+        camara.lookAt(0, 1.5, 0);
+    });
+ 
+    const vectorVelocidad = new THREE.Vector3();
+    const vectorDireccion = new THREE.Vector3();
+    let tiempoAnterior = performance.now();
+ 
+    function animar() {
+        requestAnimationFrame(animar);
+ 
+        const tiempoActual = performance.now();
+        const delta = (tiempoActual - tiempoAnterior) / 1000;
+ 
+        if (controles.isLocked) {
+            vectorVelocidad.x -= vectorVelocidad.x * 10.0 * delta;
+            vectorVelocidad.z -= vectorVelocidad.z * 10.0 * delta;
+ 
+            vectorDireccion.z = Number(teclas.w) - Number(teclas.s);
+            vectorDireccion.x = Number(teclas.d) - Number(teclas.a);
+            vectorDireccion.normalize();
+ 
+            const velocidadMovimiento = 40.0;
+ 
+            if (teclas.w || teclas.s) {
+                vectorVelocidad.z -= vectorDireccion.z * velocidadMovimiento * delta;
+            }
+ 
+            if (teclas.a || teclas.d) {
+                vectorVelocidad.x -= vectorDireccion.x * velocidadMovimiento * delta;
+            }
+ 
+            controles.moveRight(-vectorVelocidad.x * delta);
+            controles.moveForward(-vectorVelocidad.z * delta);
+ 
+            camara.position.y = ALTURA_SUELO;
+ 
+            actualizarProximidad();
+        } else if (!explorando) {
+            camara.lookAt(0, 1.5, 0);
+ 
+            if (contenedorCasco) {
+                contenedorCasco.rotation.y += 0.0015;
+            }
+        }
+ 
+        sistemaParticulas.rotation.y += 0.0005;
+ 
+        tiempoAnterior = tiempoActual;
+        renderizador.render(escena, camara);
+    }
+ 
+    animar();
+ 
+    window.addEventListener("resize", () => {
+        camara.aspect = window.innerWidth / window.innerHeight;
+        camara.updateProjectionMatrix();
+        renderizador.setSize(window.innerWidth, window.innerHeight);
+        ajustarModelo();
+    });
+</script>
+ 
+</body>
+</html>
