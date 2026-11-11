@@ -1,0 +1,268 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { font-family: 'Poppins', sans-serif; background: #071b2c; color: white; overflow: hidden; }
+
+#contenedor { position: fixed; inset: 0; width: 100%; height: 100%; }
+canvas { display: block; }
+
+nav {
+    position: absolute; top: 0; left: 0; width: 100%;
+    padding: 20px 5%; display: flex; justify-content: space-between; align-items: center;
+    z-index: 5; background: linear-gradient(#071b2cdd, transparent);
+}
+.logo { color: #e5b84b; font-size: 25px; font-weight: 800; }
+nav a { color: white; text-decoration: none; margin-left: 25px; font-size: 13px; }
+
+#portada {
+    position: absolute; inset: 0; z-index: 4; display: flex; align-items: center;
+    padding: 8%; background: linear-gradient(90deg, #071b2cdd, #071b2c55);
+}
+.contenido { max-width: 650px; }
+.contenido h3 { color: #e5b84b; font-size: 18px; margin-bottom: 12px; }
+.contenido h1 { font-size: clamp(35px, 6vw, 65px); line-height: 1.1; margin-bottom: 20px; }
+.contenido p { font-size: 15px; line-height: 1.8; color: #ddd; margin-bottom: 25px; }
+
+button {
+    border: none; background: #d6a63b; color: #101b25; padding: 14px 28px;
+    border-radius: 5px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+button:hover { background: #f0c45e; }
+
+/* ---------- Música ---------- */
+.botones-portada { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-sec {
+    background: transparent; color: white; border: 1px solid #d6a63b;
+}
+.btn-sec:hover { background: #d6a63b33; }
+
+/* El reproductor queda dentro de la pantalla pero invisible (YouTube no reproduce si está fuera) */
+#ytPlayer {
+    position: fixed; right: 0; bottom: 0; width: 200px; height: 200px;
+    opacity: 0.01; pointer-events: none; z-index: -1;
+}
+
+#btnMusica {
+    display: none; position: absolute; right: 20px; bottom: 80px; z-index: 3;
+    padding: 8px 14px; font-size: 13px;
+    background: #071b2cdd; color: white; border: 1px solid #d6a63b; border-radius: 10px;
+}
+#btnMusica:hover { background: #163b5a; }
+
+#instrucciones {
+    display: none; position: absolute; top: 90px; left: 15px;
+    z-index: 3; background: #071b2cdd; border: 1px solid #d6a63b;
+    padding: 12px 16px; border-radius: 8px; text-align: left; font-size: 13px;
+    line-height: 1.8; pointer-events: none;
+    width: min(300px, calc(100vw - 30px)); max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+#controlesMoviles {
+    display: none; position: fixed; left: 18px; bottom: 20px; z-index: 6;
+    grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px);
+    gap: 7px; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+#controlesMoviles.visible { display: grid; }
+#controlesMoviles button {
+    width: 54px; height: 54px; padding: 0; border: 1px solid #f0c45e;
+    border-radius: 14px; background: #071b2cdd; color: white; font-size: 23px;
+    box-shadow: 0 3px 12px #0008; touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+#controlesMoviles button:active, #controlesMoviles button.presionado {
+    background: #d6a63b; color: #101b25; transform: scale(.94);
+}
+#controlesMoviles .movil-arriba { grid-column: 2; grid-row: 1; }
+#controlesMoviles .movil-izquierda { grid-column: 1; grid-row: 2; }
+#controlesMoviles .movil-abajo { grid-column: 2; grid-row: 2; }
+#controlesMoviles .movil-derecha { grid-column: 3; grid-row: 2; }
+
+#panelInfo {
+    display: none; position: absolute; right: 25px; top: 50%; transform: translateY(-50%);
+    z-index: 4; width: min(350px, 85%); padding: 25px; border-radius: 10px;
+    background: #071b2cee; border: 1px solid #d6a63b;
+}
+#panelInfo h2 { color: #e5b84b; margin-bottom: 12px; }
+#panelInfo p { line-height: 1.7; font-size: 14px; }
+
+#pausa {
+    display: none; position: absolute; inset: 0; z-index: 6; background: #071b2cdd;
+    align-items: center; justify-content: center; text-align: center;
+}
+#pausa h1 { margin-bottom: 20px; }
+
+#cargando {
+    position: absolute; inset: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: center; text-align: center; padding: 20px;
+    background: #071b2c; font-size: 20px; color: #e5b84b;
+}
+
+/* ---------- Aviso de animal / casco cercano ---------- */
+#avisoAnimal {
+    display: none; position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+    z-index: 3; align-items: center; gap: 14px; padding: 12px 22px;
+    background: #071b2cee; border: 1px solid #d6a63b; border-radius: 12px;
+    cursor: pointer; font-weight: 600; font-size: 16px; color: white;
+    box-shadow: 0 0 20px #d6a63b55; animation: pulso 1.6s ease-in-out infinite;
+    user-select: none;
+}
+#avisoAnimal:hover { background: #0d2a42; }
+#avisoAnimal .tecla {
+    width: 40px; height: 40px; display: grid; place-items: center;
+    background: #d6a63b; color: #101b25; border-radius: 8px;
+    font-weight: 800; font-size: 22px;
+}
+#avisoAnimal small { color: #b8c4cc; font-weight: 400; font-size: 11px; display: block; }
+@keyframes pulso {
+    0%, 100% { box-shadow: 0 0 10px #d6a63b44; }
+    50% { box-shadow: 0 0 26px #d6a63baa; }
+}
+
+#marcadoresDestinos {
+    display: none; position: fixed; inset: 0; z-index: 4; overflow: hidden;
+    pointer-events: none;
+}
+#marcadoresDestinos.visible { display: block; }
+.destino-marcador {
+    position: absolute; width: 32px; height: 32px; padding: 0; border: 0;
+    background: transparent; transform: translate(-50%, -50%);
+    pointer-events: auto;
+}
+.destino-punto {
+    position: absolute; left: 50%; bottom: 0; width: 19px; height: 19px;
+    transform: translateX(-50%); border: 2px solid white; border-radius: 50%;
+    background: #e5b84b; box-shadow: 0 0 0 5px #e5b84b55, 0 0 16px #e5b84b;
+}
+.destino-marcador::after {
+    content: ""; position: absolute; left: 50%; bottom: 17px; height: 12px;
+    border-left: 1px solid #fff4bf; transform: translateX(-50%);
+}
+.destino-etiqueta {
+    position: absolute; left: 50%; bottom: 29px; padding: 5px 10px;
+    transform: translateX(-50%); border: 1px solid #d6a63b88; border-radius: 16px;
+    background: #071b2cdd; color: white; font-size: 11px; font-weight: 700;
+    line-height: 1.2; white-space: nowrap; text-transform: uppercase;
+}
+.destino-marcador:hover .destino-punto,
+.destino-marcador:focus-visible .destino-punto {
+    background: #fff1ad; box-shadow: 0 0 0 7px #e5b84b77, 0 0 22px #fff1ad;
+}
+.destino-marcador:focus-visible { outline: none; }
+
+#menuDestinos {
+    display: none; position: fixed; top: 90px; right: 20px; z-index: 5;
+    width: min(230px, calc(100vw - 40px));
+}
+#menuDestinos.visible { display: block; }
+#btnMenuDestinos {
+    width: 100%; padding: 10px 14px; display: flex; justify-content: space-between;
+    background: #071b2cee; color: white; border: 1px solid #d6a63b;
+}
+#listaDestinos {
+    margin-top: 6px; padding: 6px; border: 1px solid #d6a63b;
+    border-radius: 8px; background: #071b2cf5; box-shadow: 0 8px 24px #0008;
+}
+#listaDestinos[hidden] { display: none; }
+#listaDestinos button {
+    display: block; width: 100%; padding: 10px 12px; text-align: left;
+    background: transparent; color: white; border-radius: 5px;
+}
+#listaDestinos button:hover, #listaDestinos button:focus-visible {
+    background: #d6a63b33; outline: none;
+}
+#estadoDestinos { padding: 4px 8px; color: #f0c45e; font-size: 12px; }
+#estadoDestinos:empty { display: none; }
+
+/* ---------- Panel Día / Tarde / Noche ---------- */
+#panelAmbiente {
+    display: none; position: absolute; left: 20px; bottom: 20px; z-index: 3;
+    gap: 6px; flex-wrap: wrap; max-width: calc(100% - 40px); padding: 8px;
+    background: #071b2cdd; border: 1px solid #d6a63b; border-radius: 10px;
+}
+.amb-btn {
+    padding: 8px 12px; font-size: 12px; font-weight: 600;
+    background: #0d2a42; color: white; border: 1px solid #d6a63b55;
+}
+.amb-btn:hover { background: #163b5a; }
+.amb-btn.activo { background: #d6a63b; color: #101b25; border-color: #d6a63b; }
+
+/* ---------- Panel de vistas de cámara ---------- */
+#panelVistas {
+    display: none; position: absolute; right: 20px; bottom: 20px; z-index: 3;
+    gap: 6px; flex-wrap: wrap; max-width: calc(100% - 40px); padding: 8px;
+    background: #071b2cdd; border: 1px solid #d6a63b; border-radius: 10px;
+}
+.vista-btn {
+    padding: 8px 12px; font-size: 12px; font-weight: 600;
+    background: #0d2a42; color: white; border: 1px solid #d6a63b55;
+}
+.vista-btn:hover { background: #163b5a; }
+.vista-btn.activo { background: #d6a63b; color: #101b25; border-color: #d6a63b; }
+
+/* ---------- Visor 3D ---------- */
+#visor {
+    display: none; position: fixed; inset: 0; z-index: 8;
+    background: #040f19d9; backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+}
+.visor-caja {
+    width: min(1100px, 94%); height: min(680px, 90vh);
+    display: flex; flex-direction: column;
+    background: #071b2cf5; border: 1px solid #d6a63b; border-radius: 14px; overflow: hidden;
+}
+.visor-cabecera {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 22px; border-bottom: 1px solid #d6a63b44;
+}
+.visor-cabecera h2 { color: #e5b84b; font-size: 22px; }
+.visor-cabecera button { padding: 8px 18px; }
+.visor-cuerpo { display: flex; flex: 1; min-height: 0; }
+#visorCanvas { position: relative; flex: 1.2; min-height: 0; min-width: 0; overflow: hidden; }
+#visorCanvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#visorEstado {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 20px; color: #e5b84b; font-size: 16px; pointer-events: none;
+}
+#visorInfo {
+    flex: 1; min-width: 0; overflow-y: auto; padding: 18px 22px;
+    border-left: 1px solid #d6a63b44; font-size: 14px; line-height: 1.7;
+}
+#visorInfo h3 { color: #e5b84b; font-size: 15px; margin: 14px 0 6px; }
+#visorInfo h3:first-child { margin-top: 0; }
+#visorInfo p { color: #ddd; }
+#visorInfo .foto { width: 100%; border-radius: 8px; margin-bottom: 4px; }
+#visorInfo .foto-credito, #visorInfo .fuente { font-size: 12px; color: #9fb0bb; }
+#visorInfo a { color: #f0c45e; word-break: break-all; }
+#visorInfo ul { list-style: none; padding: 0; }
+#visorInfo li { margin-bottom: 8px; }
+.visor-pie { padding: 10px; text-align: center; font-size: 12px; color: #9fb0bb; border-top: 1px solid #d6a63b22; }
+
+/* ---------- Coordenadas (tecla P) ---------- */
+#coords {
+    display: none; position: absolute; top: 80px; left: 20px; z-index: 3;
+    background: #000000aa; padding: 8px 12px; border-radius: 6px;
+    font-family: monospace; font-size: 12px; color: #9ff;
+}
+
+@media(max-width: 700px) {
+    .visor-cuerpo { flex-direction: column; }
+    #visorCanvas { flex: 0 0 45%; }
+    #visorInfo { border-left: none; border-top: 1px solid #d6a63b44; }
+}
+@media(max-width: 600px) {
+    nav { padding: 15px; }
+    nav a { margin-left: 8px; font-size: 10px; }
+    .contenido { padding-top: 50px; }
+    #instrucciones { top: 75px; left: 10px; width: min(260px, calc(100vw - 20px)); font-size: 11px; }
+}
+
+@media (pointer: coarse), (max-width: 700px) {
+    #controlesMoviles.visible { display: grid; }
+    #panelAmbiente {
+        left: auto; right: 12px; bottom: 12px; max-width: 48%;
+        justify-content: center;
+    }
+    #panelVistas {
+        right: 12px; bottom: 105px; max-width: 48%; justify-content: flex-end;
+    }
+    #btnMusica { right: 12px; bottom: 175px; }
+}
