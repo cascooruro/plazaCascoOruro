@@ -21,7 +21,7 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 // ======================================
 
 const CFG = {
-    alturaPersonaje: 0.07,
+    alturaPersonaje: 0.085,
     tamanoMapa: 150,
     alturaCamaraObjetivo: 1.1,
     velocidad: 1.0,           // caminar
@@ -34,6 +34,7 @@ const CFG = {
     pixelRatioMin: 0.65,      // resolución mínima a la que puede bajar
     meteoros: 25,             // cantidad de meteoritos (bájalo si va lento)
     anisotropia: 4,           // calidad de texturas lejanas
+    texturaMax: 1024,         // reduce el uso de memoria de GPU en equipos modestos
 
     // --- Día / Tarde / Noche ---
     ambienteInicial: 'tarde', // 'dia', 'tarde' o 'noche'
@@ -195,12 +196,26 @@ const FUENTE_CASCO_TIWY = {
     url: 'https://www.tiwy.com/pais/bolivia/oruro/casco_del_minero/esp.phtml'
 };
 
+// ---------------------------------------------------------------------
+// FUENTE OFICIAL DEL CASCO (pendiente)
+// Cuando tengas la URL real del Gobierno Autónomo Municipal de Oruro
+// (o de otra institución), descomenta este bloque y agrega
+// FUENTE_CASCO_OFICIAL AL INICIO del arreglo "fuentes" del casco.
+// ---------------------------------------------------------------------
+// const FUENTE_CASCO_OFICIAL = {
+//     autor: 'Gobierno Autónomo Municipal de Oruro',
+//     titulo: 'Título de la página o documento oficial',
+//     url: 'https://...',
+//     oficial: true
+// };
+
 const ANIMALES = [
     {
         id: 'hormiga', nombre: 'Hormiga', letra: 'H', tecla: 'KeyH',
         archivos: ['hormiga.glb'],
         buscar: /hormiga|(^|[^a-z])ants?([^a-z]|$)/,
         posicion: { x: -0.36, z: 6.34, radio: 0.4 },
+        posicionMarcador: { x: -2.49, y: 1.95, z: 2.82 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Desde el Este llegó un ejército de hormigas que, según el relato, nació de la cabeza del lagarto decapitado. Cuando los urus pedían ayuda a la Ñusta, ella detuvo la plaga y la convirtió en dunas de arena.',
@@ -212,6 +227,7 @@ const ANIMALES = [
         archivos: ['serpiente2.glb'],
         buscar: /serpiente|culebra|snake|cobra|vibora/,
         posicion: { x: 4.82, z: 6.28, radio: 0.4 },
+        posicionMarcador: { x: 5.95, y: 2.28, z: 2.04 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Por el Sur apareció una gigantesca víbora entre los cerros. Los urus clamaron a la Ñusta, quien partió su cuerpo con una espada y la dejó convertida en piedra.',
@@ -223,6 +239,7 @@ const ANIMALES = [
         archivos: ['sapo4.glb'],
         buscar: /sapo|toad|frog|(^|[^a-z])rana/,
         posicion: { x: 3.17, z: 8.95, radio: 0.4 },
+        posicionMarcador: { x: 2.25, y: 2.12, z: 5.68 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Por el Norte llegó un sapo de tamaño colosal. La Ñusta lo enfrentó con una honda y lo convirtió en piedra.',
@@ -234,6 +251,7 @@ const ANIMALES = [
         archivos: ['lagarto2.glb'],
         buscar: /lagarto|lagartija|lizard|gecko|iguana/,
         posicion: { x: 1.97, z: 4.02, radio: 0.4 },
+        posicionMarcador: { x: 1.98, y: 2.25, z: -0.92 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Por el Oeste, Huari envió un enorme lagarto, que fue decapitado. Cerca de Oruro, en Cala Cala, hay una laguna cuyas aguas se ven rojizas a cierta hora del día. La leyenda dice que se formó con la sangre del lagarto.',
@@ -244,6 +262,7 @@ const ANIMALES = [
         id: 'casco', nombre: 'Casco del Minero', letra: 'E', tecla: 'KeyE',
         archivos: ['casco.glb'],
         posicion: { x: 2.19, z: 7.31, radio: 0.5 },
+        posicionMarcador: { x: 1.61, y: 2.22, z: 3.47 },
         activacion: 1.5,
         tituloLeyenda: 'Historia',
         tituloExplicacion: 'Significado',
@@ -334,6 +353,7 @@ let panelUIAbierto = false;   // un panel de EXPLORAR / mapa está abierto
 let recursosListos = 0;
 let falloCarga = false;
 let contadorFrames = 0;
+let historiaMostrada = false; // la historia del casco se abre sola una vez al entrar
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
@@ -451,23 +471,75 @@ let pixelRatioActual = Math.min(window.devicePixelRatio || 1, CFG.pixelRatioMax)
 let acumTiempo = 0;
 let acumFrames = 0;
 let tiempoMarcadores = 0;
-const ESCALA_CONTORNO = 0.75;
+const ESCALA_CONTORNO = 0.5;
 
 
 // ======================================
 // UTILIDADES
 // ======================================
 
+// ---------- Pantalla de carga ----------
+function setProgresoCarga(p) {
+    p = Math.max(0, Math.min(100, p));
+    const r = document.getElementById('cargandoRelleno');
+    const t = document.getElementById('cargandoPorcentaje');
+    if (r) r.style.width = Math.max(3, p) + '%';
+    if (t) t.textContent = Math.round(p) + '%';
+}
+
 function textoCarga(mensaje) {
     if (falloCarga) return;
-    document.getElementById('cargando').textContent = mensaje;
+    const el = document.getElementById('cargandoTexto');
+    if (el) el.textContent = mensaje;
+
+    const m = /(\d+)%/.exec(mensaje);
+    if (m) {
+        let p = +m[1];
+        if (/mapa/i.test(mensaje)) p = p * 0.6;                 // mapa: 0 a 60 %
+        else if (/colision/i.test(mensaje)) p = 60 + p * 0.4;   // colisiones: 60 a 100 %
+        setProgresoCarga(p);
+    }
 }
 
 function errorDeCarga(mensaje) {
+    if (audioClave === 'carga') detenerAudio();
     falloCarga = true;
     const c = document.getElementById('cargando');
     c.style.display = 'flex';
-    c.textContent = mensaje;
+    c.classList.remove('oculto');
+    c.classList.add('error');
+    document.getElementById('cargandoTexto').textContent = mensaje;
+}
+
+// Datos de historia que van rotando mientras carga
+let temporizadorDatosCarga = null;
+
+function iniciarDatosCarga() {
+    const historia = textoGuia('casco');
+    if (historia) hablar(historia, 'carga');
+
+    const datos = CURIOSIDADES.casco.concat(TEXTO_CULTURA.slice(0, 1));
+    const el = document.getElementById('cargandoDato');
+    if (!el || !datos.length) return;
+    let i = Math.floor(Math.random() * datos.length);
+
+    function mostrar() {
+        el.style.opacity = 0;
+        setTimeout(function() {
+            el.textContent = 'Sabías que… ' + datos[i++ % datos.length];
+            el.style.opacity = 1;
+        }, 350);
+    }
+    mostrar();
+    temporizadorDatosCarga = setInterval(mostrar, 5000);
+}
+
+function ocultarCarga() {
+    clearInterval(temporizadorDatosCarga);
+    setProgresoCarga(100);
+    const c = document.getElementById('cargando');
+    c.classList.add('oculto');
+    setTimeout(function() { c.style.display = 'none'; }, 650);
 }
 
 function aplicarPixelRatio() {
@@ -501,14 +573,6 @@ function vigilarRendimiento(dtReal) {
         console.log('Rendimiento bajo: resolución ajustada a', pixelRatioActual);
     }
 }
-
-function esperarLibre() {
-    return new Promise(function(resolver) {
-        if ('requestIdleCallback' in window) requestIdleCallback(function() { resolver(); }, { timeout: 2000 });
-        else setTimeout(resolver, 300);
-    });
-}
-
 
 // ======================================
 // FONDO Y PARTÍCULAS
@@ -725,6 +789,10 @@ function configurarPanelVistas() {
 // ======================================
 
 const VIDEO_MUSICA = 'QKv2B-Z6_nc';
+const VIDEO_CASCO_ID = 'caCLoKaZQME';
+const VIDEO_CASCO_URL = 'https://www.youtube.com/watch?v=' + VIDEO_CASCO_ID;
+const VIDEO_CASCO_EMBED_URL = 'https://www.youtube-nocookie.com/embed/' + VIDEO_CASCO_ID +
+    '?autoplay=1&mute=1&controls=1&rel=0&playsinline=1';
 let ytPlayer = null;
 let ytListo = false;
 let ytApiCargando = false;
@@ -803,6 +871,7 @@ function configurarBotonMusica() {
 function iniciarEscena() {
 
     escena = new THREE.Scene();
+    iniciarDatosCarga();
     crearFondo();
     escena.fog = new THREE.FogExp2(0x1e252b, 0.0018);
 
@@ -811,7 +880,7 @@ function iniciarEscena() {
     );
     camara.position.set(0, 4, 8);
 
-    renderizador = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderizador = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     renderizador.setSize(window.innerWidth, window.innerHeight);
     renderizador.setPixelRatio(pixelRatioActual);
     renderizador.outputColorSpace = THREE.SRGBColorSpace;
@@ -822,10 +891,12 @@ function iniciarEscena() {
     renderizador.shadowMap.autoUpdate = false;
     renderizador.shadowMap.needsUpdate = true;
     contenedor.appendChild(renderizador.domElement);
-
     renderizador.domElement.addEventListener('webglcontextlost', function(e) {
         e.preventDefault();
-        errorDeCarga('Se perdió el contexto gráfico (poca memoria de video). Cierra otras pestañas y recarga la página (F5).');
+        errorDeCarga('Se perdió el contexto gráfico (poca memoria de video). Recargando...');
+    });
+    renderizador.domElement.addEventListener('webglcontextrestored', function() {
+        location.reload();
     });
 
     composer = new EffectComposer(renderizador);
@@ -899,6 +970,46 @@ function iniciarEscena() {
 // CARGAR MAPA
 // ======================================
 
+// Reduce en memoria las texturas demasiado grandes (evita perder el contexto WebGL por falta de VRAM)
+function limitarTexturas(raiz, maximo) {
+    const vistas = new Set();
+    let bytes = 0;
+    let reducidas = 0;
+
+    raiz.traverse(function(o) {
+        if (!o.isMesh) return;
+        [].concat(o.material).forEach(function(m) {
+            if (!m) return;
+            for (const k in m) {
+                const t = m[k];
+                if (!t || !t.isTexture || !t.image || vistas.has(t)) continue;
+                vistas.add(t);
+
+                let w = t.image.width, h = t.image.height;
+                if (w && h && Math.max(w, h) > maximo) {
+                    const f = maximo / Math.max(w, h);
+                    const nw = Math.max(1, Math.round(w * f));
+                    const nh = Math.max(1, Math.round(h * f));
+                    const c = document.createElement('canvas');
+                    c.width = nw;
+                    c.height = nh;
+                    c.getContext('2d').drawImage(t.image, 0, 0, nw, nh);
+                    if (t.image.close) t.image.close();
+                    t.image = c;
+                    t.needsUpdate = true;
+                    console.log('Textura reducida', k, w + 'x' + h, '->', nw + 'x' + nh, o.name);
+                    w = nw; h = nh;
+                    reducidas++;
+                }
+                bytes += (w || 0) * (h || 0) * 4 * 1.33;
+            }
+        });
+    });
+
+    console.log('Texturas del mapa:', vistas.size, '| reducidas:', reducidas,
+        '| VRAM aprox.:', (bytes / 1048576).toFixed(0) + ' MB');
+}
+
 function construirColisiones(mallas, alTerminar) {
     let i = 0;
     const total = mallas.length;
@@ -918,7 +1029,7 @@ function construirColisiones(mallas, alTerminar) {
 }
 
 function cargarEscenario() {
-    loader.load('trabajo1.glb', function(gltf) {
+    loader.load('CascoOruro.glb', function(gltf) {
 
         grupoMapa = gltf.scene;
 
@@ -970,6 +1081,8 @@ function cargarEscenario() {
             }
         });
 
+        limitarTexturas(grupoMapa, CFG.texturaMax);
+
         escena.updateMatrixWorld(true);
 
         grupoMapa.traverse(function(o) { o.matrixAutoUpdate = false; });
@@ -982,7 +1095,6 @@ function cargarEscenario() {
             construirZonasAnimales();
             recursoListo();
 
-            precargarAnimales();
             cargarMeteoros();
         });
 
@@ -994,7 +1106,7 @@ function cargarEscenario() {
         }
     }, function(error) {
         console.error('Error cargando mapa:', error);
-        errorDeCarga('No se pudo cargar trabajo1.glb. Revisa que esté junto a index.html y abre la página desde un servidor (no con doble clic).');
+        errorDeCarga('No se pudo cargar CascoOruro.glb. Revisa que esté junto a index.html y abre la página desde un servidor (no con doble clic).');
     });
 }
 
@@ -1071,14 +1183,16 @@ function actualizarZonaAnimal() {
         }
     }
 
-    if (mejor === zonaActual) return;
-    zonaActual = mejor;
-    if (zonaActual) registrarDescubrimiento(zonaActual.animal.id);
+    if (mejor !== zonaActual) {
+        zonaActual = mejor;
+        if (zonaActual) registrarDescubrimiento(zonaActual.animal.id);
+    }
 
     const aviso = document.getElementById('avisoAnimal');
     if (zonaActual) {
         document.getElementById('avisoLetra').textContent = zonaActual.animal.letra;
         document.getElementById('avisoNombre').textContent = zonaActual.animal.nombre;
+        document.getElementById('avisoAccion').textContent = 'Presiona la tecla o haz clic';
         aviso.style.display = 'flex';
     } else {
         aviso.style.display = 'none';
@@ -1173,11 +1287,12 @@ function actualizarMarcadoresDestinos() {
             continue;
         }
 
-        const punto = _posicionMarcador.set(
-            animal.posicion.x,
-            1.5,
-            animal.posicion.z
-        ).project(camara);
+        const posicion = animal.posicionMarcador || {
+            x: animal.posicion.x,
+            y: 1.5,
+            z: animal.posicion.z
+        };
+        const punto = _posicionMarcador.set(posicion.x, posicion.y, posicion.z).project(camara);
         const x = (punto.x + 1) * ancho / 2;
         const y = (1 - punto.y) * alto / 2;
         const visible = punto.z >= -1 && punto.z <= 1 &&
@@ -1203,7 +1318,8 @@ const visor = {
     controles: null,
     grupo: null,
     mixer: null,
-    reloj: new THREE.Clock()
+    reloj: new THREE.Clock(),
+    observador: null
 };
 
 const cacheModelos = {};
@@ -1215,7 +1331,7 @@ function iniciarVisor() {
 
     const cont = document.getElementById('visorCanvas');
 
-    visor.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    visor.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
     visor.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     visor.renderer.outputColorSpace = THREE.SRGBColorSpace;
     visor.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1245,7 +1361,8 @@ function iniciarVisor() {
     visor.controles.minDistance = 0.8;
     visor.controles.maxDistance = 12;
 
-    new ResizeObserver(ajustarVisor).observe(cont);
+    visor.observador = new ResizeObserver(ajustarVisor);
+    visor.observador.observe(cont);
 }
 
 function ajustarVisor() {
@@ -1343,13 +1460,6 @@ function descargarModelo(animal) {
     return promesa;
 }
 
-async function precargarAnimales() {
-    for (const animal of ANIMALES) {
-        await esperarLibre();
-        try { await descargarModelo(animal); } catch (e) { /* se reintentará al abrir el visor */ }
-    }
-}
-
 function mostrarInfoAnimal(animal) {
     const cont = document.getElementById('visorInfo');
     cont.innerHTML = '';
@@ -1398,6 +1508,9 @@ function mostrarInfoAnimal(animal) {
         animal.fuentes.forEach(function(f) {
             const li = document.createElement('li');
             li.className = 'fuente';
+            const etiqueta = document.createElement('strong');
+            etiqueta.textContent = f.oficial ? '✔ Oficial · ' : 'Referencia (prensa/blog) · ';
+            li.appendChild(etiqueta);
             li.appendChild(document.createTextNode(f.autor + ' — ' + f.titulo + ' '));
             const a = document.createElement('a');
             a.href = f.url;
@@ -1458,8 +1571,23 @@ window.cerrarVisor = function() {
     visorActual = null;
     detenerAudio();
     document.getElementById('visor').style.display = 'none';
+    liberarVisor();
     reloj.getDelta();
 };
+
+// Libera el segundo contexto WebGL del visor para no acumular VRAM
+function liberarVisor() {
+    if (!visor.renderer) return;
+    limpiarModeloVisor();
+    if (visor.observador) { visor.observador.disconnect(); visor.observador = null; }
+    if (visor.controles) { visor.controles.dispose(); visor.controles = null; }
+    const canvas = visor.renderer.domElement;
+    visor.renderer.dispose();
+    visor.renderer.forceContextLoss();
+    if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    visor.renderer = null;
+    visor.escena = null;
+}
 
 function renderVisor() {
     if (!visor.renderer) return;
@@ -1709,14 +1837,14 @@ function recursoListo() {
 
     const inicioSeguro = buscarPuntoRespawn();
     if (!inicioSeguro) {
-        errorDeCarga('No se encontró una superficie transitable en trabajo1.glb.');
+        errorDeCarga('No se encontró una superficie transitable en CascoOruro.glb.');
         return;
     }
     puntoRespawn.copy(inicioSeguro);
 
     reaparecer();
 
-    document.getElementById('cargando').style.display = 'none';
+    ocultarCarga();
     actualizarCamara(0, true);
 }
 
@@ -2527,6 +2655,7 @@ window.iniciarExploracion = function(conMusica) {
         return;
     }
 
+    if (audioClave === 'carga') detenerAudio();
     explorando = true;
     pausado = false;
     reloj.getDelta();
@@ -2537,7 +2666,11 @@ window.iniciarExploracion = function(conMusica) {
     mostrarAyudaInicial();   // ayuda breve que se oculta sola (botón ⌨️ para verla de nuevo)
     document.getElementById('panelAmbiente').style.display = 'flex';
     document.getElementById('panelVistas').style.display = 'flex';
+    document.getElementById('listaVistas').setAttribute('aria-hidden', 'false');
     document.getElementById('panelCamara').style.display = 'flex';
+    mostrarCoords = true;
+    textoCoordsAnterior = '';
+    document.getElementById('coords').style.display = 'block';
     document.getElementById('btnMusica').style.display = 'block';
     document.getElementById('menuDestinos').classList.add('visible');
     document.getElementById('marcadoresDestinos').classList.add('visible');
@@ -2546,6 +2679,16 @@ window.iniciarExploracion = function(conMusica) {
     }
 
     alIniciarExploracion();
+
+    // Al entrar, se abre sola la historia del Casco del Minero (una vez por visita)
+    if (!historiaMostrada) {
+        historiaMostrada = true;
+        setTimeout(function() {
+            if (explorando && !pausado && !panelUIAbierto && !visorAbierto && !informacionAbierta) {
+                abrirSeccion('historia');
+            }
+        }, 1200);
+    }
 
     actualizarCamara(0, true);
 };
@@ -2621,7 +2764,7 @@ function teclaPresionada(e) {
         if (e.code === 'KeyG') { if (tourActivo) terminarTour(true); else iniciarTour(); return; }
     }
 
-    // P: muestra tus coordenadas
+    // P: muestra u oculta tus coordenadas
     if (e.code === 'KeyP' && !e.repeat && explorando) {
         mostrarCoords = !mostrarCoords;
         document.getElementById('coords').style.display = mostrarCoords ? 'block' : 'none';
@@ -2739,9 +2882,9 @@ function animar() {
     if (mixer && !informacionAbierta) mixer.update(delta);
 
     if (mostrarCoords && jugador) {
-        const txt = 'x: ' + jugador.position.x.toFixed(2) +
-            '   z: ' + jugador.position.z.toFixed(2) +
-            '   y: ' + jugador.position.y.toFixed(2);
+        const txt = 'Posición 3D · X: ' + jugador.position.x.toFixed(2) +
+            '   Y: ' + jugador.position.y.toFixed(2) +
+            '   Z: ' + jugador.position.z.toFixed(2);
         if (txt !== textoCoordsAnterior) {
             textoCoordsAnterior = txt;
             document.getElementById('coords').textContent = txt;
@@ -2818,12 +2961,16 @@ const FUENTE_FUNDACION_2 = {
 const FUENTE_UNESCO_2001 = {
     autor: 'UNESCO · Oficina Regional de Cultura para América Latina y el Caribe',
     titulo: 'Obras maestras del patrimonio oral e intangible de la región',
-    url: 'https://www.lacult.unesco.org/docc/oralidad_11_12-13-obras-maestras.pdf'
+    url: 'https://www.lacult.unesco.org/docc/oralidad_11_12-13-obras-maestras.pdf',
+    oficial: true
 };
+// Ficha oficial de UNESCO del Carnaval de Oruro (Lista Representativa).
+// Verifica que el enlace abra correctamente antes de publicar.
 const FUENTE_UNESCO_2008 = {
-    autor: 'eju.tv (nov. 2026)',
-    titulo: 'Alcalde interpone acción popular contra la ACFO para que se cumpla reglamento del Carnaval de Oruro',
-    url: 'https://eju.tv/2026/11/alcalde-interpone-accion-popular-contra-la-acfo-para-que-se-cumpla-reglamento-del-carnaval-de-oruro/'
+    autor: 'UNESCO · Patrimonio Cultural Inmaterial',
+    titulo: 'Carnaval de Oruro (Lista Representativa del Patrimonio Cultural Inmaterial de la Humanidad)',
+    url: 'https://ich.unesco.org/es/RL/el-carnaval-de-oruro-00003',
+    oficial: true
 };
 
 // Altitud: dato de la CIUDAD (no del monumento). Las fuentes consultadas no coinciden entre sí.
@@ -3540,6 +3687,7 @@ function renderMapa(c, opciones) {
 
 let seccionActual = null;
 
+// Separa las fuentes oficiales de las de referencia (prensa / blogs)
 function crearFuentes(lista) {
     const cont = crear('div');
     if (!lista || !lista.length) return cont;
@@ -3547,6 +3695,7 @@ function crearFuentes(lista) {
     const ul = crear('ul');
     lista.forEach(function(f) {
         ul.appendChild(crear('li', { class: 'fuente' },
+            crear('strong', { texto: f.oficial ? '✔ Oficial · ' : 'Referencia (prensa/blog) · ' }),
             f.autor + ' — ' + f.titulo + ' ',
             enlace(f.url, f.url, '')
         ));
@@ -3750,6 +3899,24 @@ function renderGaleria(c) {
     }));
 }
 
+function renderVideo(c) {
+    c.appendChild(crear('p', {
+        texto: 'Video del Casco del Minero de Oruro. Puedes reproducirlo aquí.'
+    }));
+    c.appendChild(crear('iframe', {
+        class: 'video-embed',
+        src: VIDEO_CASCO_EMBED_URL,
+        title: 'Casco del minero de Oruro',
+        loading: 'lazy',
+        allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+        allowfullscreen: true,
+        referrerpolicy: 'strict-origin-when-cross-origin'
+    }));
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        enlace('Abrir video en YouTube', VIDEO_CASCO_URL)
+    ));
+}
+
 function renderTiempo(c) {
     c.appendChild(crear('p', { texto: 'Acontecimientos de la ciudad, del Carnaval y del monumento. Cada hito indica su fuente.' }));
     c.appendChild(crearLineaTiempo());
@@ -3795,6 +3962,7 @@ const SECCIONES = {
     monumentos:      { titulo: 'Monumentos',             icono: '🗿', render: renderMonumentos,      claves: 'casco del minero escultura plaza ubicacion' },
     cultura:         { titulo: 'Cultura',                icono: '🎭', render: renderCultura,         claves: 'carnaval diablada leyenda plagas nusta huari unesco oruro' },
     animales:        { titulo: 'Animales',               icono: '🐍', render: renderAnimales,        claves: 'plagas hormiga serpiente sapo lagarto' },
+    video:           { titulo: 'Video del Casco del Minero', icono: '▶️', render: renderVideo, claves: 'video casco minero oruro youtube' },
     turismo:         { titulo: 'Información turística',  icono: 'ℹ️', render: renderTurismo,         claves: 'como llegar altitud estacion horarios visitar' },
     galeria:         { titulo: 'Galería fotográfica',    icono: '🖼️', render: renderGaleria,         claves: 'fotos imagenes fotografias historicas' },
     mapa:            { titulo: 'Mapa turístico',         icono: '🗺️', render: renderMapa,            claves: 'ubicacion latitud longitud google maps como llegar mi ubicacion', ancha: true },
@@ -3820,11 +3988,6 @@ function marcarItemExplorar(nombre) {
 }
 
 function cerrarMenusFlotantes() {
-    const vistas = porId('listaVistas');
-    const btnVistas = porId('btnMenuVistas');
-    if (vistas) { vistas.classList.remove('abierto'); vistas.setAttribute('aria-hidden', 'true'); }
-    if (btnVistas) btnVistas.setAttribute('aria-expanded', 'false');
-
     const lista = porId('listaDestinos');
     const btnDest = porId('btnMenuDestinos');
     if (lista) lista.hidden = true;
@@ -4233,29 +4396,7 @@ function iniciarInterfazTurismo() {
         e.currentTarget.blur();
     });
 
-    // --- Menú de cámaras (desplegable) ---
-    const btnVistas = porId('btnMenuVistas');
-    const listaVistas = porId('listaVistas');
-    btnVistas.addEventListener('click', function() {
-        const abrir = !listaVistas.classList.contains('abierto');
-        listaVistas.classList.toggle('abierto', abrir);
-        listaVistas.setAttribute('aria-hidden', String(!abrir));
-        btnVistas.setAttribute('aria-expanded', String(abrir));
-        btnVistas.blur();
-    });
-    listaVistas.querySelectorAll('.vista-btn').forEach(function(b) {
-        b.addEventListener('click', function() {
-            listaVistas.classList.remove('abierto');
-            listaVistas.setAttribute('aria-hidden', 'true');
-            btnVistas.setAttribute('aria-expanded', 'false');
-        });
-    });
     document.addEventListener('pointerdown', function(e) {
-        if (!porId('panelVistas').contains(e.target)) {
-            listaVistas.classList.remove('abierto');
-            listaVistas.setAttribute('aria-hidden', 'true');
-            btnVistas.setAttribute('aria-expanded', 'false');
-        }
         const caja = porId('buscador');
         if (caja && !porId('cuerpoExplorar').contains(e.target)) porId('resultadosBusqueda').hidden = true;
     });

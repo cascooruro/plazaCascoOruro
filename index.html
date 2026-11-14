@@ -27,7 +27,19 @@
 
 <!-- ======================= ESCENARIO 3D ======================= -->
 <div id="contenedor"></div>
-<div id="cargando">Preparando la experiencia...</div>
+
+<!-- ======================= PANTALLA DE CARGA ======================= -->
+<div id="cargando">
+    <div class="carga-caja">
+        <div class="carga-casco" aria-hidden="true">⛑️</div>
+        <div class="carga-logo">ORURO</div>
+        <div class="carga-sub">Monumento al Casco del Minero</div>
+        <div class="carga-barra"><span id="cargandoRelleno"></span></div>
+        <div id="cargandoPorcentaje">0%</div>
+        <div id="cargandoTexto" role="status" aria-live="polite">Preparando la experiencia...</div>
+        <p id="cargandoDato"></p>
+    </div>
+</div>
 
 <!-- ======================= BARRA SUPERIOR ======================= -->
 <header id="barraSuperior">
@@ -46,10 +58,9 @@
         </button>
     </div>
 
-    <!-- Parte superior derecha: INICIO, CULTURA, lugares, mapa y herramientas -->
+    <!-- Parte superior derecha: INICIO, lugares, mapa y herramientas -->
     <nav id="barraDerecha" aria-label="Navegación principal">
         <a class="nav-link" href="index.html">INICIO</a>
-        <a class="nav-link" href="cultura.html">CULTURA</a>
 
         <div id="menuDestinos">
             <button id="btnMenuDestinos" type="button" aria-expanded="false" aria-controls="listaDestinos">
@@ -108,11 +119,11 @@
         <li><kbd>W A S D</kbd> / flechas / botones táctiles: mover</li>
         <li><kbd>Shift</kbd> correr · <kbd>Espacio</kbd> saltar</li>
         <li><b>Arrastrar</b> cámara · <b>Rueda</b> zoom</li>
-        <li><kbd>E</kbd> información / casco · <kbd>H</kbd> <kbd>C</kbd> <kbd>S</kbd> <kbd>L</kbd> animales (cerca de ellos)</li>
+        <li><kbd>E</kbd> información / casco · <kbd>H</kbd> <kbd>C</kbd> <kbd>S</kbd> <kbd>L</kbd> animales</li>
         <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> día · tarde · noche · auto</li>
         <li><kbd>5</kbd>–<kbd>9</kbd> vistas de cámara · <kbd>0</kbd> volver al personaje</li>
         <li><kbd>M</kbd> mapa · <kbd>G</kbd> visita guiada · <kbd>F</kbd> modo foto</li>
-        <li><kbd>P</kbd> coordenadas internas · <kbd>ESC</kbd> cerrar / pausa</li>
+        <li><kbd>P</kbd> mostrar / ocultar coordenadas · <kbd>ESC</kbd> cerrar / pausa</li>
     </ul>
 </div>
 
@@ -142,9 +153,8 @@
 
         <ul class="exp-lista">
             <li><button type="button" class="exp-item" data-seccion="historia" tabindex="-1"><span class="ico">📜</span>Historia</button></li>
-            <li><button type="button" class="exp-item" data-seccion="monumentos" tabindex="-1"><span class="ico">🗿</span>Monumentos</button></li>
-            <li><button type="button" class="exp-item" data-seccion="cultura" tabindex="-1"><span class="ico">🎭</span>Cultura</button></li>
             <li><button type="button" class="exp-item" data-seccion="animales" tabindex="-1"><span class="ico">🐍</span>Animales</button></li>
+            <li><button type="button" class="exp-item" data-seccion="video" tabindex="-1"><span class="ico">▶️</span>Video del Casco del Minero</button></li>
             <li><button type="button" class="exp-item" data-seccion="turismo" tabindex="-1"><span class="ico">ℹ️</span>Información turística</button></li>
             <li><button type="button" class="exp-item" data-seccion="galeria" tabindex="-1"><span class="ico">🖼️</span>Galería fotográfica</button></li>
         </ul>
@@ -152,8 +162,6 @@
         <p class="exp-sub">Herramientas</p>
         <ul class="exp-lista">
             <li><button type="button" class="exp-item" data-seccion="mapa" tabindex="-1"><span class="ico">🗺️</span>Mapa turístico</button></li>
-            <li><button type="button" class="exp-item" data-seccion="tiempo" tabindex="-1"><span class="ico">⏳</span>Línea de tiempo</button></li>
-            <li><button type="button" class="exp-item" data-seccion="descubrimientos" tabindex="-1"><span class="ico">🏆</span>Mis descubrimientos</button></li>
         </ul>
     </div>
 </aside>
@@ -175,18 +183,15 @@
     <button class="amb-btn" data-amb="auto" tabindex="-1" title="Automático (4)"><span class="ico">🔄</span><span class="etq">Auto</span></button>
 </div>
 
-<!-- ======================= PARTE INFERIOR DERECHA: CÁMARAS (menú desplegable) ======================= -->
+<!-- ======================= VISTAS DE CÁMARA ======================= -->
 <div id="panelVistas">
-    <button id="btnMenuVistas" type="button" aria-expanded="false" aria-controls="listaVistas" tabindex="-1">
-        <span class="ico" aria-hidden="true">🎥</span><span class="etq">Cámaras</span><span aria-hidden="true">▴</span>
-    </button>
-    <div id="listaVistas" aria-hidden="true">
-        <button class="vista-btn" data-vista="Digit5" tabindex="-1">5 · Vista superior</button>
-        <button class="vista-btn" data-vista="Digit6" tabindex="-1">6 · Vista frontal</button>
-        <button class="vista-btn" data-vista="Digit7" tabindex="-1">7 · Vista lateral</button>
-        <button class="vista-btn" data-vista="Digit8" tabindex="-1">8 · Vista trasera</button>
-        <button class="vista-btn" data-vista="Digit9" tabindex="-1">9 · Vista panorámica</button>
-        <button class="vista-btn" data-vista="Digit0" tabindex="-1">0 · Volver al personaje</button>
+    <div id="listaVistas" aria-hidden="false">
+        <button class="vista-btn" data-vista="Digit5" tabindex="-1">5 · Arriba</button>
+        <button class="vista-btn" data-vista="Digit6" tabindex="-1">6 · Frente</button>
+        <button class="vista-btn" data-vista="Digit7" tabindex="-1">7 · Lado</button>
+        <button class="vista-btn" data-vista="Digit8" tabindex="-1">8 · Atrás</button>
+        <button class="vista-btn" data-vista="Digit9" tabindex="-1">9 · Panorama</button>
+        <button class="vista-btn" data-vista="Digit0" tabindex="-1">0 · Personaje</button>
     </div>
 </div>
 
@@ -198,11 +203,11 @@
     <span class="tecla" id="avisoLetra">H</span>
     <div>
         <span id="avisoNombre">Hormiga</span>
-        <small>Presiona la tecla o haz clic</small>
+        <small id="avisoAccion">Presiona la tecla o haz clic</small>
     </div>
 </div>
 
-<!-- ======================= MARCADORES DE DESTINOS (id corregido) ======================= -->
+<!-- ======================= MARCADORES DE DESTINOS ======================= -->
 <div id="marcadoresDestinos" aria-label="Puntos de interés">
     <button class="destino-marcador" type="button" data-marcador="hormiga" aria-label="Ver Hormiga" tabindex="-1">
         <span class="destino-punto"></span><span class="destino-etiqueta">Hormiga</span>

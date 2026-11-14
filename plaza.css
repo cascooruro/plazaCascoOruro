@@ -39,7 +39,7 @@ canvas { display: block; }
 #lugarActual, #indicadorExploracion, #menuDestinos #btnMenuDestinos, #listaDestinos,
 #btnUbicacion, #btnVisita, #btnFoto, #btnAyuda,
 #panelExplorar #btnExplorar, #cuerpoExplorar,
-#panelSeccion, #panelAmbiente, #panelVistas #btnMenuVistas, #listaVistas,
+#panelSeccion, #panelAmbiente, #listaVistas,
 #btnMusica, #avisoAnimal, #tourCard, #panelInfo, #instrucciones, #toasts .toast {
     -webkit-backdrop-filter: blur(14px) saturate(1.3);
     backdrop-filter: blur(14px) saturate(1.3);
@@ -115,11 +115,11 @@ body.explorando #panelExplorar.solo-explorando { display: block !important; }
 }
 .nav-link:hover { color: var(--oro-claro); background: rgba(255, 255, 255, .08); }
  
-.icono-btn, #btnMenuDestinos, #btnExplorar, #btnMenuVistas {
+.icono-btn, #btnMenuDestinos, #btnExplorar {
     display: flex; align-items: center; gap: 7px; padding: 9px 13px; font-size: 12px;
     background: var(--vidrio); color: white; border: 1px solid var(--borde);
 }
-.icono-btn:hover, #btnMenuDestinos:hover, #btnExplorar:hover, #btnMenuVistas:hover {
+.icono-btn:hover, #btnMenuDestinos:hover, #btnExplorar:hover {
     background: rgba(214, 166, 59, .22); border-color: var(--oro);
 }
 .icono-btn.activo { background: var(--oro); color: #101b25; }
@@ -280,8 +280,13 @@ kbd {
 #seccionCuerpo ul { list-style: none; }
 #seccionCuerpo li { margin-bottom: 7px; }
 #seccionCuerpo .nota { font-size: 11.5px; color: var(--texto-tenue); }
+.video-embed {
+    display: block; width: 100%; aspect-ratio: 16 / 9; height: auto;
+    border: 1px solid var(--borde); border-radius: 10px; background: #000;
+}
 .pendiente { color: var(--naranja) !important; font-style: italic; }
 .fuente { font-size: 12px; color: var(--texto-tenue); }
+.fuente strong { color: var(--oro-claro); }
  
 .fila-botones { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
 .btn-chico, .btn-enlace {
@@ -380,7 +385,7 @@ kbd {
 .info-botones button { padding: 10px 18px; font-size: 13px; }
  
 /* =====================================================================
-   PAUSA Y CARGA
+   PAUSA
    ===================================================================== */
 #pausa {
     display: none; position: absolute; inset: 0; z-index: 9; background: rgba(5, 18, 30, .82);
@@ -389,10 +394,45 @@ kbd {
 }
 #pausa h1 { margin-bottom: 20px; }
  
+/* =====================================================================
+   PANTALLA DE CARGA
+   ===================================================================== */
 #cargando {
     position: absolute; inset: 0; z-index: 20; display: flex; align-items: center;
     justify-content: center; text-align: center; padding: 20px;
-    background: #071b2c; font-size: 20px; color: #e5b84b;
+    background: radial-gradient(ellipse at 50% 35%, #0d2a42 0%, #071b2c 55%, #03090f 100%);
+    color: #e5b84b; transition: opacity .6s ease;
+}
+#cargando.oculto { opacity: 0; pointer-events: none; }
+#cargando.error .carga-barra, #cargando.error #cargandoPorcentaje,
+#cargando.error .carga-casco, #cargando.error #cargandoDato { display: none; }
+#cargando.error #cargandoTexto { color: #ffb88a; font-size: 18px; line-height: 1.6; }
+
+.carga-caja { width: min(480px, 92vw); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.carga-casco {
+    font-size: 64px; animation: cargaLatido 1.4s ease-in-out infinite;
+    filter: drop-shadow(0 0 18px #d6a63b99);
+}
+@keyframes cargaLatido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+.carga-logo { font-size: 38px; font-weight: 800; letter-spacing: .18em; color: #f0c45e; }
+.carga-sub {
+    font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+    color: #c9d3da; margin-bottom: 14px;
+}
+.carga-barra {
+    width: 100%; height: 12px; border-radius: 12px; background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(214, 166, 59, .45); overflow: hidden;
+}
+#cargandoRelleno {
+    display: block; height: 100%; width: 3%; border-radius: 12px;
+    background: linear-gradient(90deg, #e8833a, #f0c45e); box-shadow: 0 0 14px #f0c45e99;
+    transition: width .35s ease;
+}
+#cargandoPorcentaje { font-size: 28px; font-weight: 800; color: #fff; }
+#cargandoTexto { font-size: 14px; color: #e5b84b; min-height: 22px; }
+#cargandoDato {
+    margin-top: 12px; max-width: 420px; min-height: 66px; font-size: 13px; line-height: 1.6;
+    color: #c9d3da; font-style: italic; transition: opacity .4s;
 }
  
 /* =====================================================================
@@ -468,23 +508,19 @@ kbd {
 .amb-btn.activo { background: #d6a63b; color: #101b25; border-color: #d6a63b; }
  
 /* =====================================================================
-   PARTE INFERIOR DERECHA: CÁMARAS (menú desplegable)
+   VISTAS DE CÁMARA
    ===================================================================== */
 #panelVistas {
-    display: none; position: fixed; right: 20px; bottom: calc(20px + var(--seguro-abajo)); z-index: 6;
-    flex-direction: column-reverse; align-items: flex-end; gap: 8px;
+    display: none; position: fixed; top: calc(76px + var(--seguro-arriba)); left: 50%;
+    z-index: 6; transform: translateX(-50%); max-width: calc(100vw - 24px);
 }
-#btnMenuVistas { padding: 10px 14px; font-size: 12px; font-weight: 700; }
-#btnMenuVistas[aria-expanded="true"] { background: rgba(214, 166, 59, .26); border-color: var(--oro); }
 #listaVistas {
-    display: flex; flex-direction: column; gap: 4px; width: 210px; padding: 7px; border-radius: 12px;
+    display: flex; flex-direction: row; flex-wrap: nowrap; gap: 4px; width: max-content;
+    max-width: 100%; padding: 6px; border-radius: 12px; overflow-x: auto;
     background: var(--vidrio-fuerte); border: 1px solid var(--borde); box-shadow: var(--sombra);
-    opacity: 0; visibility: hidden; transform: translateY(10px);
-    transition: opacity .26s var(--suave), transform .26s var(--suave), visibility .26s;
 }
-#listaVistas.abierto { opacity: 1; visibility: visible; transform: none; }
 .vista-btn {
-    padding: 9px 12px; font-size: 12px; font-weight: 600; text-align: left;
+    padding: 8px 10px; font-size: 11px; font-weight: 600; white-space: nowrap;
     background: transparent; color: white; border: 1px solid transparent; border-radius: 8px;
 }
 .vista-btn:hover { background: #d6a63b33; }
@@ -602,6 +638,7 @@ body.modo-foto #toasts {
 #visorInfo p { color: #ddd; }
 #visorInfo .foto { width: 100%; border-radius: 8px; margin-bottom: 4px; }
 #visorInfo .foto-credito, #visorInfo .fuente { font-size: 12px; color: #9fb0bb; }
+#visorInfo .fuente strong { color: #f0c45e; }
 #visorInfo a { color: #f0c45e; word-break: break-all; }
 #visorInfo ul { list-style: none; padding: 0; }
 #visorInfo li { margin-bottom: 8px; }
@@ -611,7 +648,7 @@ body.modo-foto #toasts {
 .visor-pie { padding: 10px; text-align: center; font-size: 12px; color: #9fb0bb; border-top: 1px solid #d6a63b22; }
  
 /* =====================================================================
-   COORDENADAS INTERNAS (tecla P)
+   COORDENADAS DEL PERSONAJE EN EL MAPA 3D
    ===================================================================== */
 #coords {
     display: none; position: fixed; top: calc(118px + var(--seguro-arriba)); right: 22px; z-index: 5;
@@ -670,6 +707,8 @@ body.modo-foto #toasts {
     #toasts { top: calc(98px + var(--seguro-arriba)); }
     #tourCard { bottom: calc(150px + var(--seguro-abajo)); padding: 13px 15px; }
     #panelInfo { right: 50%; transform: translate(50%, -50%); }
+    .carga-casco { font-size: 52px; }
+    .carga-logo { font-size: 32px; }
 }
  
 @media (pointer: coarse), (max-width: 700px) {
@@ -680,7 +719,12 @@ body.modo-foto #toasts {
     }
     .amb-btn { padding: 8px 9px; }
     .amb-btn .etq { display: none; }
-    #panelVistas { right: 12px; bottom: calc(66px + var(--seguro-abajo)); }
+    #panelVistas {
+        top: calc(68px + var(--seguro-arriba)); left: 8px; right: 8px; max-width: none;
+        transform: none; justify-content: center;
+    }
+    #listaVistas { gap: 3px; padding: 4px; }
+    .vista-btn { padding: 7px 6px; font-size: 10px; }
     #btnMusica { left: auto; right: 12px; bottom: calc(118px + var(--seguro-abajo)); }
 }
  
@@ -688,4 +732,3 @@ body.modo-foto #toasts {
     .contenido { padding-top: 50px; }
     #listaDestinos { width: 200px; }
 }
- 
