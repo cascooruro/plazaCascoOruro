@@ -1,64 +1,185 @@
+
+/* =====================================================================
+   ORURO · TURISMO VIRTUAL 3D
+   Paleta: azul oscuro, negro, dorado y pequeños detalles naranja.
+   Paneles semitransparentes con efecto de vidrio.
+   ===================================================================== */
+ 
+:root {
+    --azul: #071b2c;
+    --azul-2: #0d2a42;
+    --negro: #03090f;
+    --oro: #d6a63b;
+    --oro-claro: #f0c45e;
+    --oro-texto: #e5b84b;
+    --naranja: #e8833a;
+    --texto: #ffffff;
+    --texto-suave: #c9d3da;
+    --texto-tenue: #9fb0bb;
+ 
+    --vidrio: rgba(7, 27, 44, .58);
+    --vidrio-fuerte: rgba(5, 18, 30, .86);
+    --borde: rgba(214, 166, 59, .38);
+    --borde-suave: rgba(214, 166, 59, .2);
+    --sombra: 0 10px 34px rgba(0, 0, 0, .45);
+    --radio: 14px;
+    --suave: cubic-bezier(.22, .8, .24, 1);
+    --seguro-arriba: env(safe-area-inset-top, 0px);
+    --seguro-abajo: env(safe-area-inset-bottom, 0px);
+}
+ 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
+ 
 body { font-family: 'Poppins', sans-serif; background: #071b2c; color: white; overflow: hidden; }
-
+ 
 #contenedor { position: fixed; inset: 0; width: 100%; height: 100%; }
 canvas { display: block; }
-
-nav {
-    position: absolute; top: 0; left: 0; width: 100%;
-    padding: 20px 5%; display: flex; justify-content: space-between; align-items: center;
-    z-index: 5; background: linear-gradient(#071b2cdd, transparent);
+ 
+/* El efecto vidrio se aplica a todos los paneles flotantes */
+#lugarActual, #indicadorExploracion, #menuDestinos #btnMenuDestinos, #listaDestinos,
+#btnUbicacion, #btnVisita, #btnFoto, #btnAyuda,
+#panelExplorar #btnExplorar, #cuerpoExplorar,
+#panelSeccion, #panelAmbiente, #panelVistas #btnMenuVistas, #listaVistas,
+#btnMusica, #avisoAnimal, #tourCard, #panelInfo, #instrucciones, #toasts .toast {
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    backdrop-filter: blur(14px) saturate(1.3);
 }
-.logo { color: #e5b84b; font-size: 25px; font-weight: 800; }
-nav a { color: white; text-decoration: none; margin-left: 25px; font-size: 13px; }
-
-#portada {
-    position: absolute; inset: 0; z-index: 4; display: flex; align-items: center;
-    padding: 8%; background: linear-gradient(90deg, #071b2cdd, #071b2c55);
-}
-.contenido { max-width: 650px; }
-.contenido h3 { color: #e5b84b; font-size: 18px; margin-bottom: 12px; }
-.contenido h1 { font-size: clamp(35px, 6vw, 65px); line-height: 1.1; margin-bottom: 20px; }
-.contenido p { font-size: 15px; line-height: 1.8; color: #ddd; margin-bottom: 25px; }
-
+ 
+/* ---------- Botones base ---------- */
 button {
     border: none; background: #d6a63b; color: #101b25; padding: 14px 28px;
-    border-radius: 5px; font-weight: 700; cursor: pointer; font-family: inherit;
+    border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit;
+    transition: background .2s, transform .15s, box-shadow .2s, border-color .2s;
 }
 button:hover { background: #f0c45e; }
-
-/* ---------- Música ---------- */
+button:active { transform: scale(.97); }
+button:focus-visible, a:focus-visible, input:focus-visible {
+    outline: 2px solid var(--oro-claro); outline-offset: 2px;
+}
+ 
 .botones-portada { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn-sec {
-    background: transparent; color: white; border: 1px solid #d6a63b;
-}
+.btn-sec { background: transparent; color: white; border: 1px solid #d6a63b; }
 .btn-sec:hover { background: #d6a63b33; }
-
-/* El reproductor queda dentro de la pantalla pero invisible (YouTube no reproduce si está fuera) */
-#ytPlayer {
-    position: fixed; right: 0; bottom: 0; width: 200px; height: 200px;
-    opacity: 0.01; pointer-events: none; z-index: -1;
+ 
+/* ---------- Mostrar elementos solo cuando empieza la exploración ---------- */
+.solo-explorando { display: none !important; }
+body.explorando .solo-explorando { display: flex !important; }
+body.explorando #panelExplorar.solo-explorando { display: block !important; }
+ 
+/* =====================================================================
+   BARRA SUPERIOR
+   ===================================================================== */
+#barraSuperior {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 7;
+    padding: calc(14px + var(--seguro-arriba)) 22px 28px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
+    background: linear-gradient(rgba(3, 9, 15, .62), transparent);
+    pointer-events: none;
 }
-
-#btnMusica {
-    display: none; position: absolute; right: 20px; bottom: 80px; z-index: 3;
-    padding: 8px 14px; font-size: 13px;
-    background: #071b2cdd; color: white; border: 1px solid #d6a63b; border-radius: 10px;
+#barraSuperior > * { pointer-events: auto; }
+ 
+/* Parte superior izquierda */
+#marca { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.logo {
+    color: var(--oro-texto); font-size: 25px; font-weight: 800; line-height: 1;
+    letter-spacing: .08em; text-shadow: 0 2px 12px rgba(0, 0, 0, .55);
 }
-#btnMusica:hover { background: #163b5a; }
-
+.logo::after {
+    content: ""; display: block; width: 34px; height: 3px; margin-top: 5px;
+    border-radius: 3px; background: linear-gradient(90deg, var(--naranja), var(--oro));
+}
+#lugarActual {
+    align-items: center; gap: 7px; padding: 6px 13px; border-radius: 20px;
+    background: var(--vidrio); border: 1px solid var(--borde);
+    font-size: 12px; font-weight: 600; max-width: min(260px, 70vw);
+}
+#lugarNombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .25s; }
+#indicadorExploracion {
+    align-items: center; gap: 9px; padding: 5px 12px; border-radius: 20px;
+    background: var(--vidrio); border: 1px solid var(--borde-suave);
+    color: var(--texto-suave); font-size: 11px; font-weight: 600; cursor: pointer;
+}
+#indicadorExploracion:hover { background: rgba(13, 42, 66, .75); }
+.ind-barra { width: 54px; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+#indBarraRelleno {
+    display: block; height: 100%; width: 0; border-radius: 5px;
+    background: linear-gradient(90deg, var(--naranja), var(--oro-claro)); transition: width .6s var(--suave);
+}
+ 
+/* Parte superior derecha */
+#barraDerecha { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.nav-link {
+    color: white; text-decoration: none; font-size: 12px; font-weight: 600; letter-spacing: .05em;
+    padding: 9px 11px; border-radius: 8px; text-shadow: 0 1px 6px rgba(0, 0, 0, .6);
+    transition: color .2s, background .2s;
+}
+.nav-link:hover { color: var(--oro-claro); background: rgba(255, 255, 255, .08); }
+ 
+.icono-btn, #btnMenuDestinos, #btnExplorar, #btnMenuVistas {
+    display: flex; align-items: center; gap: 7px; padding: 9px 13px; font-size: 12px;
+    background: var(--vidrio); color: white; border: 1px solid var(--borde);
+}
+.icono-btn:hover, #btnMenuDestinos:hover, #btnExplorar:hover, #btnMenuVistas:hover {
+    background: rgba(214, 166, 59, .22); border-color: var(--oro);
+}
+.icono-btn.activo { background: var(--oro); color: #101b25; }
+ 
+#menuDestinos { display: none; position: relative; }
+#menuDestinos.visible { display: block; }
+#btnMenuDestinos { justify-content: space-between; gap: 10px; }
+#listaDestinos {
+    position: absolute; top: calc(100% + 6px); right: 0; width: 220px; padding: 6px;
+    border: 1px solid var(--borde); border-radius: 12px; background: var(--vidrio-fuerte);
+    box-shadow: var(--sombra); animation: aparecer .22s var(--suave);
+}
+#listaDestinos[hidden] { display: none; }
+#listaDestinos button {
+    display: block; width: 100%; padding: 10px 12px; text-align: left; font-size: 13px;
+    background: transparent; color: white; border-radius: 8px; font-weight: 600;
+}
+#listaDestinos button:hover, #listaDestinos button:focus-visible { background: #d6a63b33; outline: none; }
+#estadoDestinos { padding: 4px 8px; color: #f0c45e; font-size: 12px; }
+#estadoDestinos:empty { display: none; }
+ 
+@keyframes aparecer { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+ 
+/* =====================================================================
+   PORTADA
+   ===================================================================== */
+#portada {
+    position: absolute; inset: 0; z-index: 4; display: flex; align-items: center;
+    padding: 8%; background: linear-gradient(90deg, rgba(3, 9, 15, .78), rgba(7, 27, 44, .12));
+}
+.contenido { max-width: 650px; }
+.contenido h3 { color: #e5b84b; font-size: 18px; margin-bottom: 12px; letter-spacing: .06em; }
+.contenido h1 { font-size: clamp(35px, 6vw, 65px); line-height: 1.1; margin-bottom: 20px; text-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
+.contenido p { font-size: 15px; line-height: 1.8; color: #ddd; margin-bottom: 25px; }
+ 
+/* =====================================================================
+   AYUDA DE CONTROLES (ya no es un panel permanente)
+   ===================================================================== */
 #instrucciones {
-    display: none; position: absolute; top: 90px; left: 15px;
-    z-index: 3; background: #071b2cdd; border: 1px solid #d6a63b;
-    padding: 12px 16px; border-radius: 8px; text-align: left; font-size: 13px;
-    line-height: 1.8; pointer-events: none;
-    width: min(300px, calc(100vw - 30px)); max-height: calc(100vh - 120px);
-    overflow-y: auto;
+    display: none; position: fixed; top: calc(118px + var(--seguro-arriba)); left: 22px; z-index: 6;
+    width: min(340px, calc(100vw - 44px)); max-height: calc(100vh - 220px); overflow-y: auto;
+    padding: 14px 18px; border-radius: var(--radio); background: var(--vidrio-fuerte);
+    border: 1px solid var(--borde); box-shadow: var(--sombra);
+    font-size: 12px; line-height: 1.7; text-align: left; pointer-events: none;
 }
-
+#instrucciones.visible { display: block; animation: aparecer .3s var(--suave); }
+#instrucciones h4 { color: var(--oro-texto); font-size: 13px; margin-bottom: 6px; }
+#instrucciones ul { list-style: none; }
+#instrucciones li { margin-bottom: 3px; color: var(--texto-suave); }
+kbd {
+    display: inline-block; min-width: 20px; padding: 0 6px; margin: 0 1px; text-align: center;
+    font-family: inherit; font-size: 11px; font-weight: 700; color: #101b25;
+    background: var(--oro); border-radius: 5px;
+}
+ 
+/* =====================================================================
+   CONTROLES TÁCTILES
+   ===================================================================== */
 #controlesMoviles {
-    display: none; position: fixed; left: 18px; bottom: 20px; z-index: 6;
+    display: none; position: fixed; left: 18px; bottom: calc(20px + var(--seguro-abajo)); z-index: 6;
     grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px);
     gap: 7px; touch-action: none; user-select: none; -webkit-user-select: none;
 }
@@ -75,32 +196,212 @@ button:hover { background: #f0c45e; }
 #controlesMoviles .movil-izquierda { grid-column: 1; grid-row: 2; }
 #controlesMoviles .movil-abajo { grid-column: 2; grid-row: 2; }
 #controlesMoviles .movil-derecha { grid-column: 3; grid-row: 2; }
-
+ 
+/* =====================================================================
+   LATERAL IZQUIERDO: EXPLORAR (desplegable)
+   ===================================================================== */
+#panelExplorar {
+    position: fixed; left: 22px; top: calc(50% - 150px); z-index: 6; width: 250px;
+}
+#btnExplorar { width: 100%; justify-content: flex-start; padding: 11px 14px; font-size: 13px; letter-spacing: .08em; }
+#btnExplorar .txt { flex: 1; text-align: left; }
+#btnExplorar .flecha { transition: transform .3s var(--suave); }
+#btnExplorar[aria-expanded="true"] { background: rgba(214, 166, 59, .26); border-color: var(--oro); }
+#btnExplorar[aria-expanded="true"] .flecha { transform: rotate(90deg); }
+ 
+#cuerpoExplorar {
+    margin-top: 8px; padding: 12px; border-radius: var(--radio);
+    background: var(--vidrio); border: 1px solid var(--borde); box-shadow: var(--sombra);
+    max-height: calc(100vh - 360px); overflow-y: auto;
+    opacity: 0; visibility: hidden; transform: translateX(-14px);
+    transition: opacity .28s var(--suave), transform .28s var(--suave), visibility .28s;
+}
+#cuerpoExplorar.abierto { opacity: 1; visibility: visible; transform: none; }
+ 
+.buscador-caja { position: relative; margin-bottom: 10px; }
+#buscador {
+    width: 100%; padding: 9px 12px; border-radius: 9px; font: inherit; font-size: 12px; color: white;
+    background: rgba(0, 0, 0, .35); border: 1px solid var(--borde-suave);
+}
+#buscador::placeholder { color: var(--texto-tenue); }
+#buscador:focus { border-color: var(--oro); outline: none; }
+#resultadosBusqueda {
+    list-style: none; margin-top: 6px; padding: 4px; border-radius: 9px;
+    background: rgba(0, 0, 0, .45); border: 1px solid var(--borde-suave);
+}
+#resultadosBusqueda[hidden] { display: none; }
+#resultadosBusqueda button {
+    display: flex; width: 100%; gap: 8px; align-items: center; text-align: left; padding: 8px 10px;
+    font-size: 12px; font-weight: 600; background: transparent; color: white; border-radius: 7px;
+}
+#resultadosBusqueda button:hover { background: #d6a63b33; }
+#resultadosBusqueda small { margin-left: auto; color: var(--texto-tenue); font-weight: 400; }
+#resultadosBusqueda .sin-resultados { padding: 8px 10px; font-size: 12px; color: var(--texto-tenue); }
+ 
+.exp-lista { list-style: none; }
+.exp-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; margin-bottom: 3px;
+    font-size: 13px; font-weight: 600; text-align: left; color: white; background: transparent;
+    border-radius: 9px; border-left: 3px solid transparent;
+}
+.exp-item:hover { background: rgba(214, 166, 59, .16); border-left-color: var(--naranja); }
+.exp-item.activo { background: rgba(214, 166, 59, .26); border-left-color: var(--oro); }
+.exp-item .ico { width: 22px; text-align: center; }
+.exp-sub {
+    margin: 10px 4px 5px; font-size: 10px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--texto-tenue);
+}
+ 
+/* =====================================================================
+   PANEL DE CONTENIDO (historia, monumentos, mapa, galería…)
+   ===================================================================== */
+#panelSeccion {
+    position: fixed; left: 288px; top: calc(96px + var(--seguro-arriba)); bottom: 86px; z-index: 6;
+    width: min(500px, calc(100vw - 320px)); display: flex; flex-direction: column;
+    border-radius: 16px; background: var(--vidrio-fuerte); border: 1px solid var(--borde);
+    box-shadow: var(--sombra);
+    opacity: 0; visibility: hidden; transform: translateX(-22px) scale(.985);
+    transition: opacity .32s var(--suave), transform .32s var(--suave), visibility .32s;
+}
+#panelSeccion.abierto { opacity: 1; visibility: visible; transform: none; }
+#panelSeccion.ancha { width: min(720px, calc(100vw - 320px)); }
+.seccion-cab {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--borde-suave);
+}
+.seccion-cab h2 { color: var(--oro-texto); font-size: 18px; }
+#btnCerrarSeccion { padding: 6px 11px; background: transparent; color: white; border: 1px solid var(--borde-suave); border-radius: 8px; }
+#btnCerrarSeccion:hover { background: #d6a63b33; }
+#seccionCuerpo { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px 20px; font-size: 13px; line-height: 1.7; }
+#seccionCuerpo h3 { color: var(--oro-texto); font-size: 14px; margin: 18px 0 6px; }
+#seccionCuerpo h3:first-child { margin-top: 0; }
+#seccionCuerpo p { color: #dbe3e8; margin-bottom: 8px; }
+#seccionCuerpo a { color: var(--oro-claro); word-break: break-word; }
+#seccionCuerpo ul { list-style: none; }
+#seccionCuerpo li { margin-bottom: 7px; }
+#seccionCuerpo .nota { font-size: 11.5px; color: var(--texto-tenue); }
+.pendiente { color: var(--naranja) !important; font-style: italic; }
+.fuente { font-size: 12px; color: var(--texto-tenue); }
+ 
+.fila-botones { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.btn-chico, .btn-enlace {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 12px; font-weight: 700;
+    border-radius: 8px; border: 1px solid var(--oro); background: var(--oro); color: #101b25 !important;
+    text-decoration: none; cursor: pointer; font-family: inherit; transition: background .2s, transform .15s;
+}
+.btn-chico:hover, .btn-enlace:hover { background: var(--oro-claro); }
+.btn-chico.sec, .btn-enlace.sec { background: transparent; color: white !important; border-color: var(--borde); }
+.btn-chico.sec:hover, .btn-enlace.sec:hover { background: #d6a63b33; }
+.btn-chico.naranja { background: var(--naranja); border-color: var(--naranja); color: #1c0f05 !important; }
+.btn-chico.naranja:hover { background: #f19a5a; }
+ 
+/* Tarjetas */
+.rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 10px; }
+.tarjeta {
+    padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, .045);
+    border: 1px solid var(--borde-suave); transition: border-color .2s, background .2s;
+}
+.tarjeta:hover { border-color: var(--borde); background: rgba(255, 255, 255, .07); }
+.tarjeta h4 { color: white; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.tarjeta p { font-size: 12px; margin: 6px 0; }
+.insignia {
+    margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    background: rgba(255, 255, 255, .1); color: var(--texto-tenue);
+}
+.insignia.ok { background: rgba(214, 166, 59, .25); color: var(--oro-claro); }
+ 
+/* Ficha de ubicación geográfica */
+.ficha-geo {
+    margin: 8px 0 12px; padding: 12px 14px; border-radius: 12px;
+    background: rgba(0, 0, 0, .28); border: 1px solid var(--borde-suave);
+}
+.ficha-geo dl { display: grid; grid-template-columns: 112px 1fr; gap: 4px 12px; font-size: 12.5px; }
+.ficha-geo dt { color: var(--texto-tenue); }
+.ficha-geo dd { color: white; word-break: break-word; }
+.ficha-geo .escena {
+    margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.55;
+    background: rgba(232, 131, 58, .1); border-left: 3px solid var(--naranja); color: var(--texto-suave);
+}
+ 
+/* Línea de tiempo */
+.linea-tiempo { position: relative; margin: 8px 0 0 8px; padding-left: 22px; border-left: 2px solid var(--borde); }
+.hito { position: relative; margin-bottom: 18px; }
+.hito::before {
+    content: ""; position: absolute; left: -29px; top: 5px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--oro); border: 2px solid var(--azul); box-shadow: 0 0 0 3px rgba(214, 166, 59, .3);
+}
+.hito .anio { font-size: 17px; font-weight: 800; color: var(--oro-claro); line-height: 1.2; }
+.hito .fecha { font-size: 11px; color: var(--naranja); font-weight: 600; margin-left: 6px; }
+.hito h4 { font-size: 13.5px; margin: 2px 0 3px; color: white; }
+.hito p { font-size: 12.5px; margin-bottom: 3px; }
+ 
+/* Galería */
+.galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+.galeria figure { margin: 0; cursor: zoom-in; border-radius: 10px; overflow: hidden; border: 1px solid var(--borde-suave); background: rgba(0, 0, 0, .3); }
+.galeria img { display: block; width: 100%; height: 110px; object-fit: cover; transition: transform .35s var(--suave); }
+.galeria figure:hover img { transform: scale(1.06); }
+.galeria figcaption { padding: 6px 8px; font-size: 11px; color: var(--texto-suave); }
+.galeria-grande { margin-top: 10px; }
+.galeria-grande img { width: 100%; max-height: 300px; object-fit: contain; border-radius: 10px; background: rgba(0, 0, 0, .4); }
+.galeria-grande p { font-size: 12px; margin-top: 6px; }
+ 
+/* Mapa */
+#mapaLeaflet {
+    position: relative; z-index: 0; isolation: isolate; width: 100%; height: 340px;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--borde); background: #0d2a42;
+}
+.estado-mapa { font-size: 12px; color: var(--oro-claro); margin: 8px 0; }
+.leaflet-container { font-family: 'Poppins', sans-serif; }
+.leaflet-popup-content { font-size: 12px; line-height: 1.55; color: #101b25; }
+.leaflet-popup-content strong { font-size: 13px; }
+.leaflet-popup-content .fila-botones { margin: 8px 0 0; }
+.pin-mapa span, .pin-visitante span, .pin-apoyo span {
+    display: block; width: 26px; height: 26px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    background: var(--oro); border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0, 0, 0, .5);
+}
+.pin-visitante span { width: 18px; height: 18px; border-radius: 50%; transform: none; background: #3b82f6; border: 3px solid #fff; }
+.pin-apoyo span { width: 18px; height: 18px; background: #8a97a1; }
+ 
+/* Progreso de descubrimientos */
+.progreso { height: 8px; border-radius: 8px; background: rgba(255, 255, 255, .12); overflow: hidden; margin: 8px 0 12px; }
+.progreso > span { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--naranja), var(--oro-claro)); transition: width .6s var(--suave); }
+ 
+/* =====================================================================
+   PANEL DE INFORMACIÓN GENERAL (tecla E)
+   ===================================================================== */
 #panelInfo {
     display: none; position: absolute; right: 25px; top: 50%; transform: translateY(-50%);
-    z-index: 4; width: min(350px, 85%); padding: 25px; border-radius: 10px;
-    background: #071b2cee; border: 1px solid #d6a63b;
+    z-index: 6; width: min(350px, 85%); padding: 25px; border-radius: 14px;
+    background: var(--vidrio-fuerte); border: 1px solid var(--borde); box-shadow: var(--sombra);
 }
 #panelInfo h2 { color: #e5b84b; margin-bottom: 12px; }
 #panelInfo p { line-height: 1.7; font-size: 14px; }
-
+.info-botones { display: flex; gap: 10px; flex-wrap: wrap; }
+.info-botones button { padding: 10px 18px; font-size: 13px; }
+ 
+/* =====================================================================
+   PAUSA Y CARGA
+   ===================================================================== */
 #pausa {
-    display: none; position: absolute; inset: 0; z-index: 6; background: #071b2cdd;
+    display: none; position: absolute; inset: 0; z-index: 9; background: rgba(5, 18, 30, .82);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     align-items: center; justify-content: center; text-align: center;
 }
 #pausa h1 { margin-bottom: 20px; }
-
+ 
 #cargando {
-    position: absolute; inset: 0; z-index: 10; display: flex; align-items: center;
+    position: absolute; inset: 0; z-index: 20; display: flex; align-items: center;
     justify-content: center; text-align: center; padding: 20px;
     background: #071b2c; font-size: 20px; color: #e5b84b;
 }
-
-/* ---------- Aviso de animal / casco cercano ---------- */
+ 
+/* =====================================================================
+   INDICADOR DE INTERACCIÓN (solo aparece cerca de un objeto)
+   ===================================================================== */
 #avisoAnimal {
-    display: none; position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
-    z-index: 3; align-items: center; gap: 14px; padding: 12px 22px;
-    background: #071b2cee; border: 1px solid #d6a63b; border-radius: 12px;
+    display: none; position: absolute; bottom: calc(60px + var(--seguro-abajo)); left: 50%; transform: translateX(-50%);
+    z-index: 5; align-items: center; gap: 14px; padding: 12px 22px;
+    background: var(--vidrio-fuerte); border: 1px solid var(--oro); border-radius: 14px;
     cursor: pointer; font-weight: 600; font-size: 16px; color: white;
     box-shadow: 0 0 20px #d6a63b55; animation: pulso 1.6s ease-in-out infinite;
     user-select: none;
@@ -116,7 +417,10 @@ button:hover { background: #f0c45e; }
     0%, 100% { box-shadow: 0 0 10px #d6a63b44; }
     50% { box-shadow: 0 0 26px #d6a63baa; }
 }
-
+ 
+/* =====================================================================
+   MARCADORES DE DESTINOS
+   ===================================================================== */
 #marcadoresDestinos {
     display: none; position: fixed; inset: 0; z-index: 4; overflow: hidden;
     pointer-events: none;
@@ -147,61 +451,128 @@ button:hover { background: #f0c45e; }
     background: #fff1ad; box-shadow: 0 0 0 7px #e5b84b77, 0 0 22px #fff1ad;
 }
 .destino-marcador:focus-visible { outline: none; }
-
-#menuDestinos {
-    display: none; position: fixed; top: 90px; right: 20px; z-index: 5;
-    width: min(230px, calc(100vw - 40px));
-}
-#menuDestinos.visible { display: block; }
-#btnMenuDestinos {
-    width: 100%; padding: 10px 14px; display: flex; justify-content: space-between;
-    background: #071b2cee; color: white; border: 1px solid #d6a63b;
-}
-#listaDestinos {
-    margin-top: 6px; padding: 6px; border: 1px solid #d6a63b;
-    border-radius: 8px; background: #071b2cf5; box-shadow: 0 8px 24px #0008;
-}
-#listaDestinos[hidden] { display: none; }
-#listaDestinos button {
-    display: block; width: 100%; padding: 10px 12px; text-align: left;
-    background: transparent; color: white; border-radius: 5px;
-}
-#listaDestinos button:hover, #listaDestinos button:focus-visible {
-    background: #d6a63b33; outline: none;
-}
-#estadoDestinos { padding: 4px 8px; color: #f0c45e; font-size: 12px; }
-#estadoDestinos:empty { display: none; }
-
-/* ---------- Panel Día / Tarde / Noche ---------- */
+ 
+/* =====================================================================
+   PARTE INFERIOR IZQUIERDA: DÍA / TARDE / NOCHE / AUTO
+   ===================================================================== */
 #panelAmbiente {
-    display: none; position: absolute; left: 20px; bottom: 20px; z-index: 3;
-    gap: 6px; flex-wrap: wrap; max-width: calc(100% - 40px); padding: 8px;
-    background: #071b2cdd; border: 1px solid #d6a63b; border-radius: 10px;
+    display: none; position: fixed; left: 20px; bottom: calc(20px + var(--seguro-abajo)); z-index: 6;
+    gap: 6px; flex-wrap: wrap; max-width: calc(100% - 40px); padding: 7px;
+    background: var(--vidrio); border: 1px solid var(--borde); border-radius: 12px; box-shadow: var(--sombra);
 }
 .amb-btn {
-    padding: 8px 12px; font-size: 12px; font-weight: 600;
-    background: #0d2a42; color: white; border: 1px solid #d6a63b55;
+    display: flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 12px; font-weight: 600;
+    background: rgba(13, 42, 66, .7); color: white; border: 1px solid #d6a63b55;
 }
 .amb-btn:hover { background: #163b5a; }
 .amb-btn.activo { background: #d6a63b; color: #101b25; border-color: #d6a63b; }
-
-/* ---------- Panel de vistas de cámara ---------- */
+ 
+/* =====================================================================
+   PARTE INFERIOR DERECHA: CÁMARAS (menú desplegable)
+   ===================================================================== */
 #panelVistas {
-    display: none; position: absolute; right: 20px; bottom: 20px; z-index: 3;
-    gap: 6px; flex-wrap: wrap; max-width: calc(100% - 40px); padding: 8px;
-    background: #071b2cdd; border: 1px solid #d6a63b; border-radius: 10px;
+    display: none; position: fixed; right: 20px; bottom: calc(20px + var(--seguro-abajo)); z-index: 6;
+    flex-direction: column-reverse; align-items: flex-end; gap: 8px;
 }
+#btnMenuVistas { padding: 10px 14px; font-size: 12px; font-weight: 700; }
+#btnMenuVistas[aria-expanded="true"] { background: rgba(214, 166, 59, .26); border-color: var(--oro); }
+#listaVistas {
+    display: flex; flex-direction: column; gap: 4px; width: 210px; padding: 7px; border-radius: 12px;
+    background: var(--vidrio-fuerte); border: 1px solid var(--borde); box-shadow: var(--sombra);
+    opacity: 0; visibility: hidden; transform: translateY(10px);
+    transition: opacity .26s var(--suave), transform .26s var(--suave), visibility .26s;
+}
+#listaVistas.abierto { opacity: 1; visibility: visible; transform: none; }
 .vista-btn {
-    padding: 8px 12px; font-size: 12px; font-weight: 600;
-    background: #0d2a42; color: white; border: 1px solid #d6a63b55;
+    padding: 9px 12px; font-size: 12px; font-weight: 600; text-align: left;
+    background: transparent; color: white; border: 1px solid transparent; border-radius: 8px;
 }
-.vista-btn:hover { background: #163b5a; }
+.vista-btn:hover { background: #d6a63b33; }
 .vista-btn.activo { background: #d6a63b; color: #101b25; border-color: #d6a63b; }
-
-/* ---------- Visor 3D ---------- */
+ 
+/* Música */
+#btnMusica {
+    display: none; position: fixed; left: 20px; bottom: calc(78px + var(--seguro-abajo)); z-index: 6;
+    padding: 7px 13px; font-size: 12px;
+    background: var(--vidrio); color: white; border: 1px solid var(--borde); border-radius: 10px;
+}
+#btnMusica:hover { background: #163b5a; }
+ 
+/* El reproductor queda dentro de la pantalla pero invisible (YouTube no reproduce si está fuera) */
+#ytPlayer {
+    position: fixed; right: 0; bottom: 0; width: 200px; height: 200px;
+    opacity: 0.01; pointer-events: none; z-index: -1;
+}
+ 
+/* =====================================================================
+   VISITA GUIADA
+   ===================================================================== */
+#tourCard {
+    position: fixed; left: 50%; bottom: calc(26px + var(--seguro-abajo)); z-index: 6;
+    width: min(560px, calc(100vw - 28px)); padding: 16px 20px 16px; border-radius: 16px;
+    background: var(--vidrio-fuerte); border: 1px solid var(--oro); box-shadow: var(--sombra);
+    opacity: 0; visibility: hidden; transform: translate(-50%, 24px);
+    transition: opacity .32s var(--suave), transform .32s var(--suave), visibility .32s;
+}
+#tourCard.abierto { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.tour-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.tour-parada { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--naranja); }
+.tour-x { padding: 4px 10px; background: transparent; color: white; border: 1px solid var(--borde-suave); }
+.tour-x:hover { background: #d6a63b33; }
+#tourTitulo { color: var(--oro-texto); font-size: 18px; margin-bottom: 4px; }
+#tourTexto { font-size: 13px; line-height: 1.65; color: #dbe3e8; margin-bottom: 8px; }
+.tour-auto { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--texto-suave); margin-bottom: 10px; cursor: pointer; }
+.tour-auto input { accent-color: var(--oro); }
+.tour-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.tour-botones button { padding: 9px 14px; font-size: 12px; }
+.tour-botones #tourAnterior, .tour-botones #tourAudio, .tour-botones #tourVer3D {
+    background: transparent; color: white; border: 1px solid var(--borde);
+}
+.tour-botones #tourAnterior:hover, .tour-botones #tourAudio:hover, .tour-botones #tourVer3D:hover { background: #d6a63b33; }
+.tour-botones #tourSiguiente { margin-left: auto; }
+body.en-tour #avisoAnimal { display: none !important; }
+ 
+/* =====================================================================
+   MODO FOTOGRAFÍA
+   ===================================================================== */
+#controlesFoto {
+    position: fixed; left: 50%; bottom: calc(22px + var(--seguro-abajo)); z-index: 8; display: flex; gap: 10px;
+    transform: translateX(-50%); opacity: 0; visibility: hidden; transition: opacity .35s;
+}
+#controlesFoto button { padding: 10px 18px; font-size: 13px; box-shadow: var(--sombra); }
+#controlesFoto .btn-sec { background: rgba(5, 18, 30, .7); }
+body.modo-foto #controlesFoto { opacity: .35; visibility: visible; }
+body.modo-foto #controlesFoto:hover, body.modo-foto #controlesFoto:focus-within { opacity: 1; }
+body.modo-foto #barraSuperior, body.modo-foto #panelExplorar, body.modo-foto #panelSeccion,
+body.modo-foto #panelAmbiente, body.modo-foto #panelVistas, body.modo-foto #btnMusica,
+body.modo-foto #controlesMoviles, body.modo-foto #marcadoresDestinos, body.modo-foto #instrucciones,
+body.modo-foto #coords, body.modo-foto #tourCard, body.modo-foto #avisoAnimal, body.modo-foto #panelInfo,
+body.modo-foto #toasts {
+    opacity: 0 !important; visibility: hidden !important; pointer-events: none !important;
+}
+ 
+/* =====================================================================
+   AVISOS FLOTANTES
+   ===================================================================== */
+#toasts {
+    position: fixed; top: calc(88px + var(--seguro-abajo) * 0); left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+}
+#toasts .toast {
+    max-width: min(420px, calc(100vw - 30px)); padding: 10px 18px; border-radius: 22px; font-size: 13px; font-weight: 600;
+    background: var(--vidrio-fuerte); border: 1px solid var(--oro); box-shadow: var(--sombra);
+    animation: toastIn .35s var(--suave); transition: opacity .4s, transform .4s;
+}
+#toasts .toast.aviso { border-color: var(--naranja); }
+#toasts .toast.saliendo { opacity: 0; transform: translateY(-8px); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-10px) scale(.96); } to { opacity: 1; transform: none; } }
+ 
+/* =====================================================================
+   VISOR 3D
+   ===================================================================== */
 #visor {
     display: none; position: fixed; inset: 0; z-index: 8;
-    background: #040f19d9; backdrop-filter: blur(4px);
+    background: #040f19d9; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
     align-items: center; justify-content: center;
 }
 .visor-caja {
@@ -234,35 +605,87 @@ button:hover { background: #f0c45e; }
 #visorInfo a { color: #f0c45e; word-break: break-all; }
 #visorInfo ul { list-style: none; padding: 0; }
 #visorInfo li { margin-bottom: 8px; }
+#visorInfo .btn-enlace, #visorInfo .btn-chico { word-break: normal; }
+#visorInfo .ficha-geo { font-size: 13px; }
+#visorInfo .ficha-geo dl { grid-template-columns: 96px 1fr; }
 .visor-pie { padding: 10px; text-align: center; font-size: 12px; color: #9fb0bb; border-top: 1px solid #d6a63b22; }
-
-/* ---------- Coordenadas (tecla P) ---------- */
+ 
+/* =====================================================================
+   COORDENADAS INTERNAS (tecla P)
+   ===================================================================== */
 #coords {
-    display: none; position: absolute; top: 80px; left: 20px; z-index: 3;
+    display: none; position: fixed; top: calc(118px + var(--seguro-arriba)); right: 22px; z-index: 5;
     background: #000000aa; padding: 8px 12px; border-radius: 6px;
     font-family: monospace; font-size: 12px; color: #9ff;
 }
-
-@media(max-width: 700px) {
+ 
+/* =====================================================================
+   ANIMACIONES REDUCIDAS
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+ 
+/* =====================================================================
+   RESPONSIVE
+   ===================================================================== */
+@media (max-width: 1100px) {
+    #panelSeccion, #panelSeccion.ancha { width: min(520px, calc(100vw - 320px)); }
+}
+ 
+@media (max-width: 900px) {
+    .icono-btn .etq { display: none; }
+    .icono-btn { padding: 9px 11px; }
+}
+ 
+@media (max-width: 700px) {
     .visor-cuerpo { flex-direction: column; }
     #visorCanvas { flex: 0 0 45%; }
     #visorInfo { border-left: none; border-top: 1px solid #d6a63b44; }
 }
-@media(max-width: 600px) {
-    nav { padding: 15px; }
-    nav a { margin-left: 8px; font-size: 10px; }
-    .contenido { padding-top: 50px; }
-    #instrucciones { top: 75px; left: 10px; width: min(260px, calc(100vw - 20px)); font-size: 11px; }
+ 
+@media (max-width: 760px) {
+    #barraSuperior { padding: calc(10px + var(--seguro-arriba)) 12px 22px; gap: 8px; }
+    .logo { font-size: 20px; }
+    .nav-link { font-size: 10px; padding: 8px 6px; }
+    #btnMenuDestinos { padding: 8px 10px; font-size: 11px; }
+    #lugarActual { font-size: 11px; padding: 5px 10px; }
+    #indicadorExploracion { font-size: 10px; }
+ 
+    #panelExplorar { left: 12px; top: auto; bottom: calc(168px + var(--seguro-abajo)); width: min(250px, calc(100vw - 24px)); }
+    #cuerpoExplorar { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; margin: 0; max-height: 52vh; }
+    #btnExplorar { padding: 9px 12px; font-size: 12px; }
+ 
+    /* El panel de contenido pasa a ser una hoja inferior */
+    #panelSeccion, #panelSeccion.ancha {
+        left: 8px; right: 8px; top: auto; bottom: calc(8px + var(--seguro-abajo)); width: auto; max-height: 72vh;
+        transform: translateY(26px);
+    }
+    #panelSeccion.abierto { transform: none; }
+    #mapaLeaflet { height: 260px; }
+    .ficha-geo dl { grid-template-columns: 96px 1fr; }
+ 
+    #instrucciones { left: 12px; top: calc(104px + var(--seguro-arriba)); font-size: 11px; }
+    #coords { right: 12px; }
+    #toasts { top: calc(98px + var(--seguro-arriba)); }
+    #tourCard { bottom: calc(150px + var(--seguro-abajo)); padding: 13px 15px; }
+    #panelInfo { right: 50%; transform: translate(50%, -50%); }
 }
-
+ 
 @media (pointer: coarse), (max-width: 700px) {
     #controlesMoviles.visible { display: grid; }
     #panelAmbiente {
-        left: auto; right: 12px; bottom: 12px; max-width: 48%;
-        justify-content: center;
+        left: auto; right: 12px; bottom: calc(12px + var(--seguro-abajo)); max-width: 52%;
+        justify-content: center; padding: 5px;
     }
-    #panelVistas {
-        right: 12px; bottom: 105px; max-width: 48%; justify-content: flex-end;
-    }
-    #btnMusica { right: 12px; bottom: 175px; }
+    .amb-btn { padding: 8px 9px; }
+    .amb-btn .etq { display: none; }
+    #panelVistas { right: 12px; bottom: calc(66px + var(--seguro-abajo)); }
+    #btnMusica { left: auto; right: 12px; bottom: calc(118px + var(--seguro-abajo)); }
 }
+ 
+@media (max-width: 600px) {
+    .contenido { padding-top: 50px; }
+    #listaDestinos { width: 200px; }
+}
+ 

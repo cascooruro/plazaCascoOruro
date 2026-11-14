@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -248,7 +247,9 @@ const ANIMALES = [
         activacion: 1.5,
         tituloLeyenda: 'Historia',
         tituloExplicacion: 'Significado',
-        foto: '', fotoAutor: '', fotoLink: '',
+        foto: 'https://commons.wikimedia.org/wiki/Special:FilePath/Casco_del_Minero,_Oruro.jpg?width=800',
+        fotoAutor: 'Parallelepiped09 (Wikimedia Commons, 2025)',
+        fotoLink: 'https://es.wikipedia.org/wiki/Archivo:Casco_del_Minero,_Oruro.jpg',
         leyenda: 'El Casco del Minero es una escultura monumental de hojalata y metal, de unos 6 metros, en la zona Norte de Oruro, dentro de la plaza circular por donde se entra a la ciudad desde la doble vía. Es obra del artista Fernando Crespo y forma parte de las esculturas de chatarra que la alcaldía impulsó en la gestión de Edgar Bazán, junto a Finelez Llanque y Tito Yugar, para dar la bienvenida a los visitantes con las danzas del Carnaval. En su superficie aparecen la actividad minera, los palliris, los mineros, los ferrocarriles y las cuatro plagas de la leyenda. En el lugar de la linterna está la imagen de la Virgen del Socavón, patrona de los mineros. El diseño original tenía un dragón encima, pero por su peso se cayó. Ya existía en 2008 y en 2016 se mejoró el lugar con fuentes de agua, jardineras, iluminación LED y una sala de exposición del Carnaval bajo el casco.',
         explicacion: 'El casco une dos ideas de Oruro: la minería, que sostiene su identidad, y la mitología del Carnaval. En las jardineras de la plaza están la víbora, las hormigas, el sapo y el lagarto, por eso los cuatro animales que visitaste forman un solo conjunto con el casco.',
         fuentes: [FUENTE_CASCO_2011, FUENTE_CASCO_2015, FUENTE_CASCO_2016, FUENTE_CASCO_2017, FUENTE_CASCO_TIWY]
@@ -329,6 +330,7 @@ let explorando = false;
 let pausado = false;
 let informacionAbierta = false;
 let visorAbierto = false;
+let panelUIAbierto = false;   // un panel de EXPLORAR / mapa está abierto
 let recursosListos = 0;
 let falloCarga = false;
 let contadorFrames = 0;
@@ -369,8 +371,55 @@ const ABAJO = new THREE.Vector3(0, -1, 0);
 // Cámara
 let camaraYaw = 0;
 let camaraPitch = 0.22;
-let distanciaCamara = 2.6;
 let arrastrando = false;
+let yawReferenciaMovimiento = null;
+
+// ---------- Modos de cámara ----------
+// normal     = como estaba antes
+// cinematica = pegada detrás del personaje, como en la foto
+// Los valores de "cinematica" son temporales: al cargar el personaje se recalculan
+// automáticamente según su altura real (ver ajustarCamaraCinematicaA).
+const CAMARAS = {
+    normal: {
+        nombre: 'Normal',
+        dist: 2.6, distMin: 2.2, distMax: 8,
+        pitch: 0.22, altura: 1.1,
+        fov: 65, near: 0.1,
+        margen: 0.2, minColision: 0.5
+    },
+    cinematica: {
+        nombre: 'Cinemática',
+        dist: 2.2, distMin: 1.2, distMax: 7,
+        pitch: 0.15, altura: 1.05,
+        fov: 60, near: 0.05,
+        margen: 0.08, minColision: 0.7
+    }
+};
+
+let modoCamara = 'cinematica';              // modo con el que empieza ('normal' o 'cinematica')
+let factorCamara = (modoCamara === 'cinematica') ? 1 : 0;   // 0 = normal, 1 = cinemática (se anima solo)
+let pitchObjetivoModo = null;
+const distPorModo = { normal: CAMARAS.normal.dist, cinematica: CAMARAS.cinematica.dist };
+camaraPitch = CAMARAS[modoCamara].pitch;    // la inclinación inicial coincide con el modo elegido
+
+// Ajusta la cámara cinemática al tamaño REAL del personaje (H = altura en unidades del mundo).
+// Cambia los multiplicadores para encuadrar a tu gusto:
+//   dist   = distancia detrás del personaje (1.3 = como la foto; más chico = más cerca)
+//   altura = punto al que mira la cámara    (0.62 = pecho; más grande = personaje más abajo en pantalla)
+function ajustarCamaraCinematicaA(H) {
+    const C = CAMARAS.cinematica;
+    C.dist        = H * 1.3;
+    C.distMin     = H * 0.7;
+    C.distMax     = H * 4;
+    C.altura      = H * 0.62;
+    C.pitch       = 0.15;
+    C.near        = Math.max(0.005, H * 0.03);
+    C.margen      = H * 0.05;
+    C.minColision = H * 0.4;
+    distPorModo.cinematica = C.dist;
+    if (modoCamara === 'cinematica') camaraPitch = C.pitch;
+    console.log('Altura real del personaje:', H.toFixed(3), '→ cámara cinemática ajustada');
+}
 
 // ---------- Vistas fijas de cámara (teclas 5 a 9, 0 = volver al personaje) ----------
 // pos = dónde está la cámara, mira = hacia dónde apunta. [x, y, z]
@@ -646,11 +695,13 @@ function elegirVista(clave) {
     if (clave === 'Digit0' || !VISTAS[clave]) {
         destinoInfoPendiente = null;
         vistaFija = null;
+        alLiberarVista();
         marcarBotonVista(clave === 'Digit0' ? 'Digit0' : null);
         if (clave === 'Digit0') setTimeout(function() { marcarBotonVista(null); }, 600);
         return;
     }
     destinoInfoPendiente = null;
+    alLiberarVista();
     if (!vistaFija) {
         camara.getWorldDirection(_vMira);
         miraActual.copy(camara.position).addScaledVector(_vMira, 5);
@@ -755,7 +806,9 @@ function iniciarEscena() {
     crearFondo();
     escena.fog = new THREE.FogExp2(0x1e252b, 0.0018);
 
-    camara = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camara = new THREE.PerspectiveCamera(
+        CAMARAS[modoCamara].fov, window.innerWidth / window.innerHeight, CAMARAS[modoCamara].near, 2000
+    );
     camara.position.set(0, 4, 8);
 
     renderizador = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -836,6 +889,8 @@ function iniciarEscena() {
     configurarMenuDestinos();
     configurarPanelVistas();
     configurarBotonMusica();
+    crearPanelCamara();
+    iniciarInterfazTurismo();
     animar();
 }
 
@@ -1018,6 +1073,7 @@ function actualizarZonaAnimal() {
 
     if (mejor === zonaActual) return;
     zonaActual = mejor;
+    if (zonaActual) registrarDescubrimiento(zonaActual.animal.id);
 
     const aviso = document.getElementById('avisoAnimal');
     if (zonaActual) {
@@ -1087,6 +1143,7 @@ function configurarMenuDestinos() {
 
 function enfocarDestino(animal) {
     if (!camara || !animal.posicion) return false;
+    alLiberarVista();
 
     const x = animal.posicion.x;
     const z = animal.posicion.z;
@@ -1333,6 +1390,8 @@ function mostrarInfoAnimal(animal) {
     agregar('h3', animal.tituloExplicacion || 'Explicación');
     agregar('p', animal.explicacion || '');
 
+    agregarSeccionesTurismo(cont, animal);
+
     if (animal.fuentes && animal.fuentes.length) {
         agregar('h3', 'Fuentes');
         const ul = document.createElement('ul');
@@ -1362,6 +1421,7 @@ async function abrirVisor(animal) {
 
     document.getElementById('visorTitulo').textContent = animal.nombre;
     mostrarInfoAnimal(animal);
+    registrarDescubrimiento(animal.id);
 
     const estado = document.getElementById('visorEstado');
     const yaEnCache = !!cacheModelos[animal.id];
@@ -1396,6 +1456,7 @@ window.cerrarVisor = function() {
     if (!visorAbierto) return;
     visorAbierto = false;
     visorActual = null;
+    detenerAudio();
     document.getElementById('visor').style.display = 'none';
     reloj.getDelta();
 };
@@ -1571,6 +1632,18 @@ function cargarPersonaje() {
         jugador.position.copy(puntoRespawn);
         jugador.rotation.y = Math.PI;
         escena.add(jugador);
+
+        // Mide la altura real usando los huesos (más fiable que la caja del modelo)
+        jugador.updateMatrixWorld(true);
+        const _vh = new THREE.Vector3();
+        let maxY = -Infinity;
+        modeloPersonaje.traverse(function(o) {
+            if (o.isBone) { o.getWorldPosition(_vh); maxY = Math.max(maxY, _vh.y); }
+        });
+        const alturaReal = isFinite(maxY)
+            ? (maxY - jugador.position.y) * 1.1
+            : new THREE.Box3().setFromObject(jugador).getSize(_vh).y;
+        ajustarCamaraCinematicaA(Math.max(alturaReal, 0.01));
 
         const meshes = [];
         modeloPersonaje.traverse(function(obj) {
@@ -2064,11 +2137,17 @@ function actualizarJugador(dt) {
     // Al caminar, la cámara vuelve al personaje
     if (vistaFija && (adelante !== 0 || derecha !== 0)) elegirVista('Digit0');
 
+    if (adelante !== 0 || derecha !== 0) {
+        if (yawReferenciaMovimiento === null) yawReferenciaMovimiento = camaraYaw;
+    } else {
+        yawReferenciaMovimiento = null;
+    }
+
     let dirX = 0, dirZ = 0;
 
     if (adelante !== 0 || derecha !== 0) {
-        dirX = Math.sin(camaraYaw) * adelante + Math.cos(camaraYaw) * derecha;
-        dirZ = -Math.cos(camaraYaw) * adelante + Math.sin(camaraYaw) * derecha;
+        dirX = Math.sin(yawReferenciaMovimiento) * adelante + Math.cos(yawReferenciaMovimiento) * derecha;
+        dirZ = -Math.cos(yawReferenciaMovimiento) * adelante + Math.sin(yawReferenciaMovimiento) * derecha;
         const l = Math.hypot(dirX, dirZ);
         dirX /= l;
         dirZ /= l;
@@ -2227,8 +2306,9 @@ function actualizarCamara(dt = 0.016, inmediata = false) {
         camara.position.lerp(_vPos, kv);
         miraActual.lerp(_vMira, kv);
         camara.lookAt(miraActual);
-        if (Math.abs(camara.fov - 65) > 0.01) {
+        if (Math.abs(camara.fov - 65) > 0.01 || camara.near !== 0.1) {
             camara.fov = 65;
+            camara.near = 0.1;
             camara.updateProjectionMatrix();
         }
         if (destinoInfoPendiente &&
@@ -2241,9 +2321,43 @@ function actualizarCamara(dt = 0.016, inmediata = false) {
         return;
     }
 
+    // ---------- Mezcla entre modo normal y cinemático ----------
+    const N = CAMARAS.normal, C = CAMARAS.cinematica;
+    const meta = (modoCamara === 'cinematica') ? 1 : 0;
+    if (inmediata) {
+        factorCamara = meta;
+    } else {
+        factorCamara += (meta - factorCamara) * (1 - Math.exp(-4 * dt));
+        if (Math.abs(meta - factorCamara) < 0.001) factorCamara = meta;
+    }
+    const mezcla = function(a, b) { return a + (b - a) * factorCamara; };
+
+    const altura = mezcla(N.altura, C.altura);
+    const distBase = Math.exp(mezcla(Math.log(distPorModo.normal), Math.log(distPorModo.cinematica)));
+    const minColision = mezcla(N.minColision, C.minColision);
+    const margen = mezcla(N.margen, C.margen);
+    const fovBase = mezcla(N.fov, C.fov);
+    const nearActual = mezcla(N.near, C.near);
+
+    // Inclinación: se acomoda sola al cambiar de modo (si arrastras el mouse, tú mandas)
+    if (pitchObjetivoModo !== null) {
+        camaraPitch += (pitchObjetivoModo - camaraPitch) * (1 - Math.exp(-5 * dt));
+        if (Math.abs(pitchObjetivoModo - camaraPitch) < 0.002) pitchObjetivoModo = null;
+    }
+
+    const rapidez = Math.hypot(vx, vz);
+    if (modoCamara === 'cinematica' && rapidez > 0.1) {
+        const yawObjetivo = Math.atan2(vx, -vz);
+        const diferenciaYaw = Math.atan2(
+            Math.sin(yawObjetivo - camaraYaw),
+            Math.cos(yawObjetivo - camaraYaw)
+        );
+        camaraYaw += diferenciaYaw * (1 - Math.exp(-3.5 * dt));
+    }
+
     _objetivo.set(
         jugador.position.x,
-        jugador.position.y + CFG.alturaCamaraObjetivo,
+        jugador.position.y + altura,
         jugador.position.z
     );
 
@@ -2254,19 +2368,19 @@ function actualizarCamara(dt = 0.016, inmediata = false) {
         Math.cos(camaraYaw) * dh
     ).normalize();
 
-    let distancia = distanciaCamara;
+    let distancia = distBase;
 
     if (objetosColision.length) {
         raycaster.set(_objetivo, _dirCam);
         raycaster.near = 0;
-        raycaster.far = distanciaCamara;
+        raycaster.far = distBase;
         const hits = raycaster.intersectObjects(objetosColision, false);
-        if (hits.length) distancia = Math.max(0.5, hits[0].distance - 0.2);
+        if (hits.length) distancia = Math.max(minColision, hits[0].distance - margen);
     }
 
     _deseada.copy(_objetivo).addScaledVector(_dirCam, distancia);
 
-    if (inmediata) {
+    if (inmediata || modoCamara === 'cinematica') {
         camara.position.copy(_deseada);
     } else {
         camara.position.lerp(_deseada, 1 - Math.exp(-20 * dt));
@@ -2274,12 +2388,68 @@ function actualizarCamara(dt = 0.016, inmediata = false) {
 
     camara.lookAt(_objetivo);
 
+    // FOV (con el efecto de correr) y plano cercano
     const rapido = corriendo && Math.hypot(vx, vz) > CFG.velocidad;
-    const fovObjetivo = rapido ? 72 : 65;
+    const fovObjetivo = rapido ? fovBase + 7 : fovBase;
+    let actualizar = false;
     if (Math.abs(camara.fov - fovObjetivo) > 0.01) {
         camara.fov += (fovObjetivo - camara.fov) * (1 - Math.exp(-6 * dt));
-        camara.updateProjectionMatrix();
+        actualizar = true;
     }
+    if (Math.abs(camara.near - nearActual) > 0.0001) {
+        camara.near = nearActual;
+        actualizar = true;
+    }
+    if (actualizar) camara.updateProjectionMatrix();
+}
+
+
+// ======================================
+// APARTADO: MODO DE CÁMARA (Normal / Cinemática) · tecla V
+// ======================================
+
+function marcarModoCamara() {
+    document.querySelectorAll('#panelCamara button[data-modo]').forEach(function(b) {
+        b.classList.toggle('activo', b.dataset.modo === modoCamara);
+    });
+}
+
+function alternarModoCamara(modo) {
+    if (!CAMARAS[modo]) modo = (modoCamara === 'normal') ? 'cinematica' : 'normal';
+    if (modo === modoCamara) return;
+    modoCamara = modo;
+    pitchObjetivoModo = CAMARAS[modo].pitch;
+    if (vistaFija) elegirVista('Digit0');   // si había una vista fija, vuelve al personaje
+    marcarModoCamara();
+    mostrarToast('🎥 Cámara: ' + CAMARAS[modo].nombre + '  (V para cambiar)');
+}
+
+function crearPanelCamara() {
+    const estilo = document.createElement('style');
+    estilo.textContent =
+        '#panelCamara{position:fixed;right:12px;bottom:78px;z-index:20;display:none;gap:6px;' +
+        'align-items:center;padding:6px 8px;background:rgba(15,15,20,.78);' +
+        'border:1px solid rgba(212,136,55,.65);border-radius:12px;color:#fff;' +
+        'font:600 13px sans-serif;backdrop-filter:blur(6px);}' +
+        '#panelCamara button{cursor:pointer;border:0;border-radius:8px;padding:6px 10px;' +
+        'background:rgba(255,255,255,.12);color:#fff;font:600 13px sans-serif;}' +
+        '#panelCamara button.activo{background:#d48837;color:#111;}' +
+        'body.modo-foto #panelCamara,body.en-tour #panelCamara{display:none!important;}';
+    document.head.appendChild(estilo);
+
+    const panel = document.createElement('div');
+    panel.id = 'panelCamara';
+    panel.appendChild(document.createTextNode('🎥 Cámara '));
+    ['normal', 'cinematica'].forEach(function(modo) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.modo = modo;
+        b.textContent = CAMARAS[modo].nombre;
+        b.addEventListener('click', function() { alternarModoCamara(modo); b.blur(); });
+        panel.appendChild(b);
+    });
+    document.body.appendChild(panel);
+    marcarModoCamara();
 }
 
 
@@ -2288,7 +2458,7 @@ function actualizarCamara(dt = 0.016, inmediata = false) {
 // ======================================
 
 function puedeControlar() {
-    return explorando && !pausado && !informacionAbierta && !visorAbierto;
+    return explorando && !pausado && !informacionAbierta && !visorAbierto && !panelUIAbierto;
 }
 
 function configurarMouse() {
@@ -2306,6 +2476,7 @@ function configurarMouse() {
     lienzo.addEventListener('pointermove', function(e) {
         if (!puedeControlar() || !arrastrando) return;
 
+        pitchObjetivoModo = null;   // si arrastras, cancelas el ajuste automático de inclinación
         camaraYaw += e.movementX * 0.0025;
         camaraPitch = THREE.MathUtils.clamp(camaraPitch + e.movementY * 0.0025, 0.05, 1.1);
     });
@@ -2313,7 +2484,11 @@ function configurarMouse() {
     lienzo.addEventListener('wheel', function(e) {
         if (!explorando || pausado || visorAbierto) return;
         e.preventDefault();
-        distanciaCamara = THREE.MathUtils.clamp(distanciaCamara + e.deltaY * 0.005, 2.2, 8);
+        const cfg = CAMARAS[modoCamara];
+        const paso = e.deltaY * 0.005 * (cfg.dist / CAMARAS.normal.dist);
+        distPorModo[modoCamara] = THREE.MathUtils.clamp(
+            distPorModo[modoCamara] + paso, cfg.distMin, cfg.distMax
+        );
     }, { passive: false });
 }
 
@@ -2359,15 +2534,18 @@ window.iniciarExploracion = function(conMusica) {
     ponerMusica(conMusica === true);
 
     document.getElementById('portada').style.display = 'none';
-    document.getElementById('instrucciones').style.display = 'block';
+    mostrarAyudaInicial();   // ayuda breve que se oculta sola (botón ⌨️ para verla de nuevo)
     document.getElementById('panelAmbiente').style.display = 'flex';
     document.getElementById('panelVistas').style.display = 'flex';
+    document.getElementById('panelCamara').style.display = 'flex';
     document.getElementById('btnMusica').style.display = 'block';
     document.getElementById('menuDestinos').classList.add('visible');
     document.getElementById('marcadoresDestinos').classList.add('visible');
     if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) {
         document.getElementById('controlesMoviles').classList.add('visible');
     }
+
+    alIniciarExploracion();
 
     actualizarCamara(0, true);
 };
@@ -2383,9 +2561,13 @@ const TECLAS_JUEGO = [
 ];
 
 function teclaPresionada(e) {
+    // Escribir en el buscador no debe mover al personaje ni activar atajos
+    const enCampoTexto = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if (enCampoTexto && e.code !== 'Escape') return;
+
     teclas[e.code] = true;
 
-    if (TECLAS_JUEGO.includes(e.code) && !visorAbierto) e.preventDefault();
+    if (TECLAS_JUEGO.includes(e.code) && !visorAbierto && !panelUIAbierto) e.preventDefault();
 
     // ESC: cierra el visor 3D, o pausa el juego
     if (e.code === 'Escape') {
@@ -2393,6 +2575,8 @@ function teclaPresionada(e) {
             window.cerrarVisor();
             return;
         }
+        if (modoFotoActivo) { alternarModoFoto(false); return; }
+        if (panelUIAbierto) { cerrarSeccion(); return; }
         if (explorando && !pausado) pausar();
         return;
     }
@@ -2413,6 +2597,12 @@ function teclaPresionada(e) {
         if (c === 'Digit0' || VISTAS[c]) { elegirVista(c); return; }
     }
 
+    // V: cambia entre cámara Normal y Cinemática
+    if (e.code === 'KeyV' && !e.repeat && puedeControlar()) {
+        alternarModoCamara();
+        return;
+    }
+
     // Tecla de la zona cercana: H C S L (animales) o E (casco)
     if (!e.repeat && zonaActual && puedeControlar() && e.code === zonaActual.animal.tecla) {
         abrirVisor(zonaActual.animal);
@@ -2420,8 +2610,15 @@ function teclaPresionada(e) {
     }
 
     // E lejos del casco: panel de información general
-    if (e.code === 'KeyE' && !e.repeat && explorando && !pausado && !visorAbierto) {
+    if (e.code === 'KeyE' && !e.repeat && explorando && !pausado && !visorAbierto && !panelUIAbierto) {
         informacionAbierta ? window.cerrarInformacion() : abrirInformacion();
+    }
+
+    // F: modo foto · M: mapa · G: visita guiada
+    if (!e.repeat && explorando && !pausado && !visorAbierto && !informacionAbierta) {
+        if (e.code === 'KeyF') { alternarModoFoto(); return; }
+        if (e.code === 'KeyM') { alternarSeccion('mapa'); return; }
+        if (e.code === 'KeyG') { if (tourActivo) terminarTour(true); else iniciarTour(); return; }
     }
 
     // P: muestra tus coordenadas
@@ -2476,6 +2673,7 @@ function pausar() {
     pausado = true;
     limpiarTeclas();
     arrastrando = false;
+    detenerAudio();
     if (musicaActiva && ytListo) ytPlayer.pauseVideo();   // la música se pausa con el juego
     document.getElementById('pausa').style.display = 'flex';
 }
@@ -2524,7 +2722,7 @@ function animar() {
     actualizarAmbiente(delta);
 
     if (explorando) {
-        if (!informacionAbierta) actualizarJugador(delta);
+        if (!informacionAbierta && !panelUIAbierto) actualizarJugador(delta);
         actualizarPersonajesSecundarios(delta);
         actualizarCamara(delta);
         tiempoMarcadores += delta;
@@ -2536,6 +2734,7 @@ function animar() {
     }
 
     actualizarZonaAnimal();
+    actualizarLugarActual(delta);
 
     if (mixer && !informacionAbierta) mixer.update(delta);
 
@@ -2563,5 +2762,1550 @@ function animar() {
     if (composer) composer.render();
     else renderizador.render(escena, camara);
 }
+
+// ============================================================================
+// ============================================================================
+//   TURISMO VIRTUAL 3D · GEOGRAFÍA, HISTORIA, MAPA, GUÍA CON AUDIO, VISITA
+//   GUIADA, MODO FOTO, BUSCADOR Y DESCUBRIMIENTOS
+//
+//   Este bloque se agregó sobre el proyecto original sin modificar la escena,
+//   los modelos, la física ni los controles. Se conecta al resto mediante:
+//     - panelUIAbierto  (bloquea el movimiento mientras hay un panel abierto)
+//     - registrarDescubrimiento() desde la zona de cada animal y desde el visor
+//     - agregarSeccionesTurismo() desde el visor 3D
+//     - alLiberarVista() desde elegirVista() / enfocarDestino()
+// ============================================================================
+// ============================================================================
+
+
+// ======================================
+// DATOS GEOGRÁFICOS REALES
+// ======================================
+// IMPORTANTE: aquí hay dos tipos de coordenadas que NO deben confundirse:
+//   - GEO.<id>.lat / lng  -> coordenadas geográficas REALES (latitud / longitud, WGS 84).
+//   - ANIMALES[i].posicion {x, z} -> coordenadas INTERNAS del escenario Three.js.
+//
+// Regla de este proyecto: no se inventan coordenadas GPS. Lo que no tiene un dato
+// verificado queda en null y la interfaz lo muestra como "Pendiente de completar".
+
+const GEO_CONTEXTO = { ciudad: 'Oruro', departamento: 'Oruro', pais: 'Bolivia' };
+
+const FUENTE_OSM_CASCO = {
+    autor: 'OpenStreetMap (datos colaborativos)',
+    titulo: 'Casco del Minero (way 380457962)',
+    url: 'https://www.openstreetmap.org/way/380457962'
+};
+const FUENTE_MAPCARTA = {
+    autor: 'Mapcarta (basado en OpenStreetMap y Wikidata)',
+    titulo: 'Casco del Minero: coordenadas y datos de Oruro',
+    url: 'https://mapcarta.com/W380457962'
+};
+const FUENTE_OSM_ESTACION = {
+    autor: 'OpenStreetMap (datos colaborativos)',
+    titulo: 'Estación Casco del Minero (node 6765375488)',
+    url: 'https://www.openstreetmap.org/node/6765375488'
+};
+const FUENTE_FUNDACION_1 = {
+    autor: 'Wikipedia (inglés)',
+    titulo: 'Oruro',
+    url: 'https://en.wikipedia.org/wiki/Oruro'
+};
+const FUENTE_FUNDACION_2 = {
+    autor: 'OpenEdition Books (Institut français d\'études andines)',
+    titulo: 'Presentación (fundación de la Villa de San Felipe de Austria)',
+    url: 'https://books.openedition.org/ifea/7341'
+};
+const FUENTE_UNESCO_2001 = {
+    autor: 'UNESCO · Oficina Regional de Cultura para América Latina y el Caribe',
+    titulo: 'Obras maestras del patrimonio oral e intangible de la región',
+    url: 'https://www.lacult.unesco.org/docc/oralidad_11_12-13-obras-maestras.pdf'
+};
+const FUENTE_UNESCO_2008 = {
+    autor: 'eju.tv (nov. 2026)',
+    titulo: 'Alcalde interpone acción popular contra la ACFO para que se cumpla reglamento del Carnaval de Oruro',
+    url: 'https://eju.tv/2026/11/alcalde-interpone-accion-popular-contra-la-acfo-para-que-se-cumpla-reglamento-del-carnaval-de-oruro/'
+};
+
+// Altitud: dato de la CIUDAD (no del monumento). Las fuentes consultadas no coinciden entre sí.
+const ALTITUD_CIUDAD = {
+    texto: 'Aprox. 3 709 m s. n. m. (altitud de la ciudad de Oruro; otras fuentes citan entre 3 706 y 3 735 m)',
+    fuente: FUENTE_MAPCARTA
+};
+
+const GEO = {
+    casco: {
+        lat: -17.9269,
+        lng: -67.11851,
+        referencia: 'Zona Norte de Oruro: plaza circular de ingreso a la ciudad, junto al parque Rotonda del Minero (según OpenStreetMap).',
+        precision: 'Punto central del elemento en OpenStreetMap. Es un dato colaborativo, no una medición de campo.',
+        fuentes: [FUENTE_OSM_CASCO, FUENTE_MAPCARTA]
+    },
+    // Los cuatro animales forman parte del conjunto del Casco del Minero (jardineras de la plaza).
+    // Sus coordenadas GPS propias están PENDIENTES: se usa el conjunto como referencia (campo "sitio").
+    hormiga:   { lat: null, lng: null, sitio: 'casco', referencia: 'Jardinera de la plaza del Casco del Minero (conjunto de las cuatro plagas).' },
+    serpiente: { lat: null, lng: null, sitio: 'casco', referencia: 'Jardinera de la plaza del Casco del Minero (conjunto de las cuatro plagas).' },
+    sapo:      { lat: null, lng: null, sitio: 'casco', referencia: 'Jardinera de la plaza del Casco del Minero (conjunto de las cuatro plagas).' },
+    lagarto:   { lat: null, lng: null, sitio: 'casco', referencia: 'Jardinera de la plaza del Casco del Minero (conjunto de las cuatro plagas).' }
+};
+
+// Punto de apoyo cercano (parada ferroviaria registrada en OpenStreetMap)
+const ESTACION_CASCO = { lat: -17.92755, lng: -67.11888, nombre: 'Estación Casco del Minero' };
+
+const EMOJI_LUGAR = { casco: '⛑️', hormiga: '🐜', serpiente: '🐍', sapo: '🐸', lagarto: '🦎' };
+
+
+// ======================================
+// CONTENIDO: DATOS CURIOSOS, CULTURA, LÍNEA DE TIEMPO Y GALERÍA
+// (todo sale de las fuentes ya citadas en el proyecto o de las fuentes nuevas indicadas)
+// ======================================
+
+const CURIOSIDADES = {
+    casco: [
+        'Mide unos 6 metros y está hecho de hojalata y metal.',
+        'En el lugar de la linterna está la imagen de la Virgen del Socavón, patrona de los mineros.',
+        'El diseño original tenía un dragón encima, pero por su peso se cayó.',
+        'Bajo el casco hay una sala de exposición del Carnaval, que se sumó a las mejoras de 2016.',
+        'En su superficie aparecen la actividad minera, los palliris, los ferrocarriles y las cuatro plagas.'
+    ],
+    hormiga: [
+        'Según el relato, el ejército de hormigas nació de la cabeza del lagarto decapitado.',
+        'La tradición dice que el arenal cercano a la ciudad es esa plaga convertida en dunas.'
+    ],
+    serpiente: [
+        'Según algunas versiones, la víbora petrificada se ve partida en dos mitades cerca de la ermita de Chiripujio.',
+        'En los trajes de los diablos, las víboras son parte del adorno.'
+    ],
+    sapo: [
+        'Una versión ubica su cuerpo petrificado junto al cerro de San Pedro.',
+        'Las versiones de la leyenda difieren porque es una tradición oral.'
+    ],
+    lagarto: [
+        'En Cala Cala hay una laguna de aguas rojizas que, según la leyenda, se formó con la sangre del lagarto.',
+        'En el Carnaval se recuerda el episodio cuando, según la tradición, algunas mujeres suben a los cerros a matar lagartijas.'
+    ]
+};
+
+const TEXTO_CULTURA = [
+    'La leyenda de las cuatro plagas cuenta que Huari envió un sapo, una víbora, un lagarto y un ejército de hormigas, y que la Ñusta, ante el clamor de los urus, detuvo cada plaga y la convirtió en piedra.',
+    'Es una tradición oral, por eso las versiones difieren en las direcciones y en los detalles.',
+    'Esta mitología se recuerda en el Carnaval de Oruro: en la Diablada, las hormigas y las víboras aparecen como símbolos en los trajes y las máscaras.',
+    'El Casco del Minero une esa mitología con la minería, que sostiene la identidad de Oruro.',
+    'El 18 de mayo de 2001, la UNESCO proclamó al Carnaval de Oruro Obra Maestra del Patrimonio Oral e Intangible de la Humanidad.'
+];
+
+const LINEA_TIEMPO = [
+    {
+        anio: '1606', fecha: '1 de noviembre',
+        titulo: 'Fundación de la Villa de San Felipe de Austria',
+        texto: 'El oidor Manuel de Castro y Padilla da inicio a la fundación de la villa minera que hoy es la ciudad de Oruro.',
+        fuentes: [FUENTE_FUNDACION_1, FUENTE_FUNDACION_2]
+    },
+    {
+        anio: '2001', fecha: '18 de mayo',
+        titulo: 'El Carnaval de Oruro, Obra Maestra de la UNESCO',
+        texto: 'La UNESCO proclama al Carnaval de Oruro Obra Maestra del Patrimonio Oral e Intangible de la Humanidad.',
+        fuentes: [FUENTE_UNESCO_2001]
+    },
+    {
+        anio: '2003', fecha: 'dato colaborativo',
+        titulo: 'Inicio del Casco del Minero según OpenStreetMap',
+        texto: 'OpenStreetMap registra 2003 como año de inicio del monumento. Es un dato colaborativo que conviene contrastar con un documento oficial.',
+        fuentes: [FUENTE_OSM_CASCO]
+    },
+    {
+        anio: '2008', fecha: 'febrero',
+        titulo: 'El Casco del Minero ya existe y está documentado',
+        texto: 'Un reportaje de febrero de 2008 describe el casco metálico, con la Virgen del Socavón en su interior y figuras del folklore minero alrededor.',
+        fuentes: [FUENTE_CASCO_TIWY]
+    },
+    {
+        anio: '2008', fecha: 'inscripción',
+        titulo: 'El Carnaval, en la Lista Representativa de la UNESCO',
+        texto: 'El Carnaval de Oruro es inscrito en la Lista Representativa del Patrimonio Cultural Inmaterial de la Humanidad.',
+        fuentes: [FUENTE_UNESCO_2008]
+    },
+    {
+        anio: '2011', fecha: '20 de febrero',
+        titulo: 'Esculturas de chatarra que dan la bienvenida',
+        texto: 'Una nota de turismo presenta las gigantescas esculturas de chatarra con las que Oruro recibe a sus visitantes.',
+        fuentes: [FUENTE_CASCO_2011]
+    },
+    {
+        anio: '2016', fecha: '28 de febrero',
+        titulo: 'Mejoras en la plaza del casco',
+        texto: 'Se mejora el lugar con fuentes de agua, jardineras, iluminación LED y una sala de exposición del Carnaval bajo el casco.',
+        fuentes: [FUENTE_CASCO_2016]
+    }
+];
+
+// Galería: solo fotografías con autor y página de origen verificables (Wikimedia Commons).
+// Para agregar más, añade un objeto con: url, titulo, autor, anio, pagina, historica (true/false).
+// Fotografías HISTÓRICAS: pendientes de completar (aún no hay ninguna verificada en el proyecto).
+const GALERIA = [
+    {
+        url: 'https://commons.wikimedia.org/wiki/Special:FilePath/Casco_del_Minero,_Oruro.jpg?width=900',
+        titulo: 'Casco del Minero, Oruro',
+        autor: 'Parallelepiped09',
+        anio: '2025',
+        pagina: 'https://es.wikipedia.org/wiki/Archivo:Casco_del_Minero,_Oruro.jpg',
+        historica: false
+    },
+    {
+        url: 'https://commons.wikimedia.org/wiki/Special:FilePath/Casco_minero_(oruro-bolivia).JPG?width=900',
+        titulo: 'Casco minero (Oruro, Bolivia)',
+        autor: 'ver la página del archivo',
+        anio: 's/f',
+        pagina: 'https://commons.wikimedia.org/wiki/File:Casco_minero_(oruro-bolivia).JPG',
+        historica: false
+    }
+];
+
+
+// ======================================
+// UTILIDADES DE INTERFAZ
+// ======================================
+
+function porId(id) { return document.getElementById(id); }
+
+function agregarHijos(nodo, hijo) {
+    if (hijo === null || hijo === undefined || hijo === false) return;
+    if (Array.isArray(hijo)) {
+        hijo.forEach(function(h) { agregarHijos(nodo, h); });
+        return;
+    }
+    nodo.appendChild(typeof hijo === 'string' ? document.createTextNode(hijo) : hijo);
+}
+
+function crear(etiqueta, atributos) {
+    const nodo = document.createElement(etiqueta);
+    if (atributos) {
+        Object.keys(atributos).forEach(function(k) {
+            const v = atributos[k];
+            if (v === null || v === undefined || v === false) return;
+            if (k === 'class') nodo.className = v;
+            else if (k === 'texto') nodo.textContent = v;
+            else if (k === 'onclick') nodo.addEventListener('click', v);
+            else if (k === 'dataset') Object.assign(nodo.dataset, v);
+            else nodo.setAttribute(k, v === true ? '' : String(v));
+        });
+    }
+    for (let i = 2; i < arguments.length; i++) agregarHijos(nodo, arguments[i]);
+    return nodo;
+}
+
+function enlace(texto, url, clase) {
+    return crear('a', {
+        class: clase === undefined ? 'btn-enlace' : clase, href: url, target: '_blank',
+        rel: 'noopener noreferrer', texto: texto
+    });
+}
+
+function boton(texto, clase, alClic) {
+    return crear('button', { type: 'button', class: clase || 'btn-chico', texto: texto, onclick: alClic });
+}
+
+function resumir(texto, maximo) {
+    texto = texto || '';
+    if (texto.length <= maximo) return texto;
+    const corte = texto.slice(0, maximo);
+    const punto = corte.lastIndexOf('. ');
+    return punto > 60 ? corte.slice(0, punto + 1) : corte.trim() + '…';
+}
+
+function normalizarTexto(t) {
+    return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function esPantallaChica() {
+    return window.matchMedia('(max-width: 760px)').matches;
+}
+
+function distanciaKm(a, b) {
+    const R = 6371;
+    const rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad;
+    const dLng = (b.lng - a.lng) * rad;
+    const x = Math.sin(dLat / 2) ** 2 +
+        Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+function formatearDistancia(km) {
+    if (km < 1) return Math.round(km * 1000) + ' m';
+    if (km < 100) return km.toFixed(1) + ' km';
+    return Math.round(km).toLocaleString('es-BO') + ' km';
+}
+
+function animalPorId(id) {
+    return ANIMALES.find(function(a) { return a.id === id; }) || null;
+}
+
+
+// ======================================
+// AVISOS FLOTANTES (toasts)
+// ======================================
+
+function mostrarToast(texto, tipo) {
+    const cont = porId('toasts');
+    if (!cont) return;
+    const t = crear('div', { class: 'toast' + (tipo ? ' ' + tipo : ''), texto: texto });
+    cont.appendChild(t);
+    while (cont.children.length > 3) cont.removeChild(cont.firstChild);
+    setTimeout(function() { t.classList.add('saliendo'); }, 3600);
+    setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 4100);
+}
+
+
+// ======================================
+// SISTEMA DE DESCUBRIMIENTO DE LUGARES
+// ======================================
+
+const CLAVE_DESCUBRIMIENTOS = 'oruro3d_descubiertos_v1';
+const descubiertos = new Set();
+
+(function cargarDescubrimientos() {
+    try {
+        const guardados = JSON.parse(localStorage.getItem(CLAVE_DESCUBRIMIENTOS) || '[]');
+        if (Array.isArray(guardados)) {
+            guardados.forEach(function(id) { if (animalPorId(id)) descubiertos.add(id); });
+        }
+    } catch (e) { /* sin almacenamiento disponible: el progreso dura solo esta visita */ }
+})();
+
+function guardarDescubrimientos() {
+    try { localStorage.setItem(CLAVE_DESCUBRIMIENTOS, JSON.stringify(Array.from(descubiertos))); }
+    catch (e) { /* ignorar */ }
+}
+
+function actualizarIndicadorExploracion() {
+    const total = ANIMALES.length;
+    const n = descubiertos.size;
+    const texto = porId('indTexto');
+    const barra = porId('indBarraRelleno');
+    if (texto) texto.textContent = 'Exploración ' + n + '/' + total;
+    if (barra) barra.style.width = Math.round((n / Math.max(1, total)) * 100) + '%';
+}
+
+function registrarDescubrimiento(id) {
+    if (!id || descubiertos.has(id)) return;
+    const animal = animalPorId(id);
+    if (!animal) return;
+
+    descubiertos.add(id);
+    guardarDescubrimientos();
+    actualizarIndicadorExploracion();
+
+    const total = ANIMALES.length;
+    if (descubiertos.size >= total) {
+        mostrarToast('🏆 ¡Descubriste todos los lugares! Exploración completa.');
+    } else {
+        mostrarToast('✨ Descubriste: ' + animal.nombre + ' (' + descubiertos.size + '/' + total + ')');
+    }
+    if (panelUIAbierto && (seccionActual === 'descubrimientos' || seccionActual === 'animales')) {
+        renderSeccion(seccionActual, {}, true);
+    }
+}
+
+
+// ======================================
+// INDICADOR DEL LUGAR QUE SE ESTÁ VISITANDO
+// ======================================
+
+let tiempoLugar = 0;
+let lugarMostrado = '';
+let lugarForzado = null;   // la visita guiada fija el nombre del lugar
+
+function actualizarLugarActual(dt) {
+    tiempoLugar += dt;
+    if (tiempoLugar < 0.25) return;
+    tiempoLugar = 0;
+    if (!explorando || !jugador) return;
+
+    let texto = 'Plaza del Casco del Minero';
+
+    if (lugarForzado) {
+        texto = lugarForzado;
+    } else {
+        let mejor = null;
+        let mejorDist = Infinity;
+        for (const z of zonas) {
+            const d = distanciaXZ(z.caja, jugador.position);
+            if (d < mejorDist) { mejorDist = d; mejor = z; }
+        }
+        if (mejor) {
+            const umbral = Math.max(2.5, mejor.activacion * 1.5);
+            if (mejorDist < umbral) texto = mejor.animal.nombre;
+            else if (mejorDist < umbral * 3) texto = 'Cerca de ' + mejor.animal.nombre;
+        }
+    }
+
+    if (texto === lugarMostrado) return;
+    lugarMostrado = texto;
+    const nombre = porId('lugarNombre');
+    if (nombre) nombre.textContent = texto;
+}
+
+
+// ======================================
+// GUÍA TURÍSTICA CON AUDIO (síntesis de voz del navegador)
+// ======================================
+
+let audioToken = 0;
+let audioHablando = false;
+let audioClave = null;
+
+function textoGuia(clave) {
+    if (clave === 'cultura') return TEXTO_CULTURA.join(' ');
+    const a = animalPorId(clave);
+    if (!a) return '';
+    return a.nombre + '. ' + (a.leyenda || '') + ' ' + (a.explicacion || '');
+}
+
+function elegirVoz() {
+    if (!('speechSynthesis' in window)) return null;
+    const voces = window.speechSynthesis.getVoices() || [];
+    const preferidas = ['es-BO', 'es-US', 'es-MX', 'es-AR', 'es-CO', 'es-ES'];
+    for (const lang of preferidas) {
+        const v = voces.find(function(x) { return x.lang && x.lang.replace('_', '-').toLowerCase() === lang.toLowerCase(); });
+        if (v) return v;
+    }
+    return voces.find(function(x) { return x.lang && x.lang.toLowerCase().startsWith('es'); }) || null;
+}
+
+function dividirEnFrases(texto) {
+    const partes = texto.match(/[^.!?;:]+[.!?;:]?\s*/g) || [texto];
+    const trozos = [];
+    let acum = '';
+    partes.forEach(function(p) {
+        if ((acum + p).length > 180 && acum) {
+            trozos.push(acum.trim());
+            acum = p;
+        } else {
+            acum += p;
+        }
+    });
+    if (acum.trim()) trozos.push(acum.trim());
+    return trozos;
+}
+
+function bajarMusica(bajar) {
+    if (!ytListo || !musicaActiva || !ytPlayer || !ytPlayer.setVolume) return;
+    try { ytPlayer.setVolume(bajar ? 15 : 50); } catch (e) { /* ignorar */ }
+}
+
+function hablar(texto, clave, alTerminar) {
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+        mostrarToast('Tu navegador no admite la guía con audio.', 'aviso');
+        return false;
+    }
+
+    detenerAudio();
+    const token = ++audioToken;
+    audioClave = clave;
+    audioHablando = true;
+    bajarMusica(true);
+
+    const trozos = dividirEnFrases(texto);
+    const voz = elegirVoz();
+    let i = 0;
+
+    function finalizar(completo) {
+        if (token !== audioToken) return;
+        audioHablando = false;
+        audioClave = null;
+        bajarMusica(false);
+        actualizarBotonesAudio();
+        if (completo && alTerminar) alTerminar();
+    }
+
+    function siguiente() {
+        if (token !== audioToken) return;
+        if (i >= trozos.length) { finalizar(true); return; }
+        const u = new SpeechSynthesisUtterance(trozos[i++]);
+        u.lang = voz ? voz.lang : 'es-ES';
+        if (voz) u.voice = voz;
+        u.rate = 0.95;
+        u.onend = siguiente;
+        u.onerror = function(ev) {
+            if (token !== audioToken) return;
+            if (ev && (ev.error === 'interrupted' || ev.error === 'canceled')) return;
+            finalizar(false);
+        };
+        window.speechSynthesis.speak(u);
+    }
+
+    siguiente();
+    actualizarBotonesAudio();
+    return true;
+}
+
+function detenerAudio() {
+    audioToken++;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (audioHablando) {
+        audioHablando = false;
+        audioClave = null;
+        bajarMusica(false);
+    }
+    actualizarBotonesAudio();
+}
+
+function etiquetaAudio(clave) {
+    return (audioHablando && audioClave === clave) ? '⏹ Detener guía' : '🔊 Escuchar guía';
+}
+
+function actualizarBotonesAudio() {
+    document.querySelectorAll('[data-audio]').forEach(function(b) {
+        if (b.dataset.audio === 'tour') {
+            b.textContent = (audioHablando && audioClave === 'tour') ? '⏹ Detener' : '🔊 Escuchar';
+        } else {
+            b.textContent = etiquetaAudio(b.dataset.audio);
+        }
+    });
+}
+
+function alternarAudio(clave) {
+    if (audioHablando && audioClave === clave) { detenerAudio(); return; }
+    const texto = textoGuia(clave);
+    if (texto) hablar(texto, clave);
+}
+
+function botonAudio(clave) {
+    const b = crear('button', { type: 'button', class: 'btn-chico sec', dataset: { audio: clave } });
+    b.textContent = etiquetaAudio(clave);
+    b.addEventListener('click', function() { alternarAudio(clave); });
+    return b;
+}
+
+
+// ======================================
+// UBICACIÓN: FICHA GEOGRÁFICA, VISITANTE Y MAPA INTERACTIVO
+// ======================================
+
+let ubicacionVisitante = null;   // solo existe si el visitante lo autorizó
+let mapaInst = null;
+let leafletPromesa = null;
+let capaVisitante = null;
+
+function urlGoogleMaps(sitio) {
+    return 'https://www.google.com/maps/search/?api=1&query=' + sitio.lat + ',' + sitio.lng;
+}
+
+function urlComoLlegar(sitio) {
+    let url = 'https://www.google.com/maps/dir/?api=1&destination=' + sitio.lat + ',' + sitio.lng;
+    if (ubicacionVisitante) url += '&origin=' + ubicacionVisitante.lat + ',' + ubicacionVisitante.lng;
+    return url;
+}
+
+function crearFichaUbicacion(id) {
+    const g = GEO[id];
+    const animal = animalPorId(id);
+    const ficha = crear('div', { class: 'ficha-geo' });
+    if (!g || !animal) return ficha;
+
+    const sitio = g.sitio ? GEO[g.sitio] : g;
+    const tieneCoordenadaPropia = typeof g.lat === 'number' && typeof g.lng === 'number';
+
+    const dl = crear('dl');
+    function fila(titulo, valor, pendiente) {
+        dl.appendChild(crear('dt', { texto: titulo }));
+        dl.appendChild(crear('dd', { class: pendiente ? 'pendiente' : null, texto: valor }));
+    }
+
+    fila('Lugar', animal.nombre);
+    fila('Ciudad', GEO_CONTEXTO.ciudad);
+    fila('Departamento', GEO_CONTEXTO.departamento);
+    fila('País', GEO_CONTEXTO.pais);
+    fila('Referencia', g.referencia);
+
+    if (tieneCoordenadaPropia) {
+        fila('Latitud', g.lat.toFixed(5) + '° (' + (g.lat < 0 ? 'Sur' : 'Norte') + ')');
+        fila('Longitud', g.lng.toFixed(5) + '° (' + (g.lng < 0 ? 'Oeste' : 'Este') + ')');
+    } else {
+        fila('Latitud', 'Pendiente de completar', true);
+        fila('Longitud', 'Pendiente de completar', true);
+    }
+
+    fila('Altitud (ciudad)', ALTITUD_CIUDAD.texto);
+    fila('Altitud (lugar)', 'Pendiente de verificar: no hay una medición del lugar', true);
+    ficha.appendChild(dl);
+
+    if (!tieneCoordenadaPropia) {
+        ficha.appendChild(crear('p', {
+            class: 'nota pendiente',
+            texto: 'Este elemento no tiene coordenada GPS propia verificada. Los botones apuntan al conjunto del Casco del Minero.'
+        }));
+    }
+
+    if (sitio && typeof sitio.lat === 'number') {
+        ficha.appendChild(crear('div', { class: 'fila-botones' },
+            enlace('📍 VER EN GOOGLE MAPS', urlGoogleMaps(sitio)),
+            enlace('🚗 CÓMO LLEGAR', urlComoLlegar(sitio), 'btn-enlace naranja'),
+            boton('🗺️ Ver en el mapa', 'btn-chico sec', function() {
+                if (visorAbierto) window.cerrarVisor();
+                abrirSeccion('mapa', { foco: id });
+            })
+        ));
+    }
+
+    if (animal.posicion) {
+        ficha.appendChild(crear('p', {
+            class: 'escena',
+            texto: 'Coordenadas internas del escenario 3D → X = ' + animal.posicion.x.toFixed(2) +
+                ', Z = ' + animal.posicion.z.toFixed(2) +
+                '. Son medidas del modelo Three.js, no son coordenadas GPS.'
+        }));
+    }
+
+    const fuentesGeo = g.fuentes || (sitio && sitio.fuentes) || [];
+    if (fuentesGeo.length) {
+        const p = crear('p', { class: 'nota' }, 'Coordenadas: ');
+        fuentesGeo.forEach(function(f, i) {
+            if (i > 0) p.appendChild(document.createTextNode(' · '));
+            p.appendChild(enlace(f.autor, f.url, ''));
+        });
+        if (g.precision || (sitio && sitio.precision)) {
+            p.appendChild(document.createTextNode('. ' + (g.precision || sitio.precision)));
+        }
+        ficha.appendChild(p);
+    }
+
+    return ficha;
+}
+
+function solicitarUbicacionVisitante(estadoEl, alExito) {
+    if (!('geolocation' in navigator)) {
+        estadoEl.textContent = 'Tu navegador no permite obtener la ubicación.';
+        return;
+    }
+    if (window.isSecureContext === false) {
+        estadoEl.textContent = 'La ubicación solo funciona en una página segura (https o localhost).';
+        return;
+    }
+    estadoEl.textContent = 'Solicitando permiso de ubicación…';
+
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        ubicacionVisitante = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            precision: pos.coords.accuracy
+        };
+        const km = distanciaKm(ubicacionVisitante, GEO.casco);
+        estadoEl.textContent = 'Ubicación detectada (precisión ±' + Math.round(pos.coords.accuracy) +
+            ' m). Estás a ' + formatearDistancia(km) + ' en línea recta del Casco del Minero.';
+        if (alExito) alExito();
+    }, function(err) {
+        const mensajes = {
+            1: 'No diste permiso: tu posición no se muestra.',
+            2: 'No se pudo determinar tu posición.',
+            3: 'Se agotó el tiempo para obtener tu posición.'
+        };
+        estadoEl.textContent = mensajes[err.code] || 'No se pudo obtener tu ubicación.';
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+
+function cargarLeaflet() {
+    if (window.L) return Promise.resolve(window.L);
+    if (leafletPromesa) return leafletPromesa;
+
+    leafletPromesa = new Promise(function(resolver, rechazar) {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(css);
+
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+        s.onload = function() { resolver(window.L); };
+        s.onerror = function() {
+            leafletPromesa = null;
+            rechazar(new Error('No se pudo cargar Leaflet'));
+        };
+        document.head.appendChild(s);
+    });
+    return leafletPromesa;
+}
+
+function destruirMapa() {
+    if (mapaInst) {
+        try { mapaInst.remove(); } catch (e) { /* ignorar */ }
+        mapaInst = null;
+    }
+    capaVisitante = null;
+}
+
+function dibujarVisitanteEnMapa() {
+    if (!mapaInst || !ubicacionVisitante || !window.L) return;
+    const L = window.L;
+    if (capaVisitante) capaVisitante.remove();
+
+    const p = [ubicacionVisitante.lat, ubicacionVisitante.lng];
+    capaVisitante = L.layerGroup([
+        L.circle(p, { radius: ubicacionVisitante.precision, color: '#3b82f6', weight: 1, fillOpacity: 0.12 }),
+        L.marker(p, {
+            icon: L.divIcon({ className: 'pin-visitante', html: '<span></span>', iconSize: [18, 18], iconAnchor: [9, 9] })
+        }).bindPopup('Tu ubicación actual (solo la ves tú)')
+    ]).addTo(mapaInst);
+
+    mapaInst.fitBounds(L.latLngBounds([p, [GEO.casco.lat, GEO.casco.lng]]).pad(0.25));
+}
+
+function crearPopupCasco() {
+    return crear('div', null,
+        crear('strong', { texto: 'Monumento al Casco del Minero' }),
+        crear('br'),
+        'Latitud ' + GEO.casco.lat.toFixed(5) + ', longitud ' + GEO.casco.lng.toFixed(5),
+        crear('br'),
+        'Conjunto: hormiga, serpiente, sapo y lagarto.',
+        crear('div', { class: 'fila-botones' },
+            enlace('Google Maps', urlGoogleMaps(GEO.casco)),
+            enlace('Cómo llegar', urlComoLlegar(GEO.casco), 'btn-enlace naranja')
+        )
+    );
+}
+
+function renderMapa(c, opciones) {
+    c.appendChild(crear('p', {
+        class: 'nota',
+        texto: 'Mapa de OpenStreetMap. Los marcadores usan coordenadas geográficas reales (latitud y longitud); no son las coordenadas X, Z del escenario 3D.'
+    }));
+
+    const contMapa = crear('div', { id: 'mapaLeaflet' });
+    const estadoMapa = crear('p', { class: 'estado-mapa', texto: 'Cargando mapa…' });
+    c.appendChild(contMapa);
+    c.appendChild(estadoMapa);
+
+    cargarLeaflet().then(function(L) {
+        if (!contMapa.isConnected) return;
+        destruirMapa();
+
+        mapaInst = L.map(contMapa, { zoomControl: true }).setView([GEO.casco.lat, GEO.casco.lng], 16);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; colaboradores de OpenStreetMap'
+        }).addTo(mapaInst);
+
+        const marcador = L.marker([GEO.casco.lat, GEO.casco.lng], {
+            icon: L.divIcon({ className: 'pin-mapa', html: '<span></span>', iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24] })
+        }).addTo(mapaInst).bindPopup(crearPopupCasco());
+
+        L.marker([ESTACION_CASCO.lat, ESTACION_CASCO.lng], {
+            icon: L.divIcon({ className: 'pin-apoyo', html: '<span></span>', iconSize: [18, 18], iconAnchor: [9, 9] })
+        }).addTo(mapaInst).bindPopup('<strong>' + ESTACION_CASCO.nombre + '</strong><br>Parada ferroviaria registrada en OpenStreetMap. Verifica el servicio con el operador.');
+
+        if (opciones.foco) marcador.openPopup();
+        estadoMapa.textContent = '';
+        setTimeout(function() { if (mapaInst) mapaInst.invalidateSize(); }, 400);
+        if (ubicacionVisitante) dibujarVisitanteEnMapa();
+    }).catch(function() {
+        estadoMapa.textContent = 'No se pudo cargar el mapa (¿sin conexión?). Puedes abrir la ubicación directamente en Google Maps.';
+        estadoMapa.classList.add('pendiente');
+    });
+
+    c.appendChild(crear('h3', { texto: 'Tu ubicación (opcional)' }));
+    const estadoUbi = crear('p', {
+        class: 'nota',
+        texto: ubicacionVisitante
+            ? 'Ubicación ya autorizada en esta visita.'
+            : 'Solo se solicita si pulsas el botón. Tu posición se usa en este navegador y no se guarda ni se envía.'
+    });
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        boton('📍 Compartir mi ubicación', 'btn-chico naranja', function() {
+            solicitarUbicacionVisitante(estadoUbi, function() { dibujarVisitanteEnMapa(); });
+        })
+    ));
+    c.appendChild(estadoUbi);
+
+    c.appendChild(crear('h3', { texto: 'Lugares en el mapa' }));
+    const lista = crear('ul');
+    lista.appendChild(crear('li', null,
+        crear('strong', { texto: EMOJI_LUGAR.casco + ' Casco del Minero' }),
+        ' · coordenada verificada en OpenStreetMap. ',
+        enlace('Google Maps', urlGoogleMaps(GEO.casco), '')
+    ));
+    ANIMALES.filter(function(a) { return a.id !== 'casco'; }).forEach(function(a) {
+        lista.appendChild(crear('li', null,
+            crear('strong', { texto: EMOJI_LUGAR[a.id] + ' ' + a.nombre }),
+            ' · dentro del conjunto del casco. ',
+            crear('span', { class: 'pendiente', texto: 'Coordenada propia pendiente de completar.' })
+        ));
+    });
+    c.appendChild(lista);
+}
+
+
+// ======================================
+// SECCIONES DEL PANEL EXPLORAR
+// ======================================
+
+let seccionActual = null;
+
+function crearFuentes(lista) {
+    const cont = crear('div');
+    if (!lista || !lista.length) return cont;
+    cont.appendChild(crear('h3', { texto: 'Fuentes' }));
+    const ul = crear('ul');
+    lista.forEach(function(f) {
+        ul.appendChild(crear('li', { class: 'fuente' },
+            f.autor + ' — ' + f.titulo + ' ',
+            enlace(f.url, f.url, '')
+        ));
+    });
+    cont.appendChild(ul);
+    return cont;
+}
+
+function crearLineaTiempo() {
+    const cont = crear('div', { class: 'linea-tiempo' });
+    LINEA_TIEMPO.forEach(function(h) {
+        const hito = crear('div', { class: 'hito' },
+            crear('div', null,
+                crear('span', { class: 'anio', texto: h.anio }),
+                crear('span', { class: 'fecha', texto: h.fecha })
+            ),
+            crear('h4', { texto: h.titulo }),
+            crear('p', { texto: h.texto })
+        );
+        const fuentes = crear('p', { class: 'nota' }, 'Fuente: ');
+        h.fuentes.forEach(function(f, i) {
+            if (i > 0) fuentes.appendChild(document.createTextNode(' · '));
+            fuentes.appendChild(enlace(f.autor, f.url, ''));
+        });
+        hito.appendChild(fuentes);
+        cont.appendChild(hito);
+    });
+    return cont;
+}
+
+function verEnVisor(id) {
+    cerrarSeccion();
+    irADestino(id);
+}
+
+function renderHistoria(c) {
+    const casco = animalPorId('casco');
+    c.appendChild(crear('h3', { texto: 'Historia del Casco del Minero' }));
+    c.appendChild(crear('p', { texto: casco.leyenda }));
+    c.appendChild(crear('h3', { texto: casco.tituloExplicacion || 'Significado' }));
+    c.appendChild(crear('p', { texto: casco.explicacion }));
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        botonAudio('casco'),
+        boton('🧊 Ver modelo 3D', 'btn-chico', function() { verEnVisor('casco'); })
+    ));
+    c.appendChild(crear('h3', { texto: 'Línea de tiempo' }));
+    c.appendChild(crearLineaTiempo());
+    c.appendChild(crearFuentes(casco.fuentes));
+}
+
+function renderMonumentos(c) {
+    const casco = animalPorId('casco');
+    c.appendChild(crear('h3', { texto: EMOJI_LUGAR.casco + ' ' + casco.nombre }));
+
+    if (casco.foto) {
+        const img = crear('img', { class: 'foto', src: casco.foto, alt: casco.nombre, loading: 'lazy' });
+        img.style.cssText = 'width:100%;max-height:240px;object-fit:cover;border-radius:10px;';
+        const credito = crear('p', { class: 'nota' }, 'Foto: ' + (casco.fotoAutor || 'autor no indicado') + ' · ');
+        if (casco.fotoLink) credito.appendChild(enlace('ver original', casco.fotoLink, ''));
+        img.onerror = function() { img.remove(); credito.remove(); };
+        c.appendChild(img);
+        c.appendChild(credito);
+    }
+
+    c.appendChild(crear('p', { texto: resumir(casco.leyenda, 360) }));
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        boton('🧊 Ver modelo 3D', 'btn-chico', function() { verEnVisor('casco'); }),
+        botonAudio('casco'),
+        boton('📜 Historia completa', 'btn-chico sec', function() { abrirSeccion('historia'); })
+    ));
+
+    c.appendChild(crear('h3', { texto: 'Datos curiosos' }));
+    const ul = crear('ul');
+    (CURIOSIDADES.casco || []).forEach(function(t) { ul.appendChild(crear('li', { texto: '• ' + t })); });
+    c.appendChild(ul);
+
+    c.appendChild(crear('h3', { texto: 'Ubicación geográfica' }));
+    c.appendChild(crearFichaUbicacion('casco'));
+
+    c.appendChild(crear('h3', { texto: 'El conjunto' }));
+    c.appendChild(crear('p', { texto: casco.explicacion }));
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        boton('🐍 Ver los animales', 'btn-chico sec', function() { abrirSeccion('animales'); })
+    ));
+    c.appendChild(crearFuentes(casco.fuentes));
+}
+
+function renderCultura(c) {
+    c.appendChild(crear('h3', { texto: 'La leyenda de las cuatro plagas' }));
+    TEXTO_CULTURA.forEach(function(t) { c.appendChild(crear('p', { texto: t })); });
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        botonAudio('cultura'),
+        boton('🐍 Conocer a las cuatro plagas', 'btn-chico sec', function() { abrirSeccion('animales'); }),
+        enlace('🎭 Página de Cultura', 'cultura.html', 'btn-enlace sec')
+    ));
+    c.appendChild(crearFuentes([FUENTE_ANF, FUENTE_UPM, FUENTE_UNESCO_2001]));
+}
+
+function renderAnimales(c) {
+    c.appendChild(crear('p', { texto: 'Las cuatro plagas de la leyenda están en las jardineras de la plaza, junto al casco.' }));
+    const rejilla = crear('div', { class: 'rejilla' });
+
+    ANIMALES.filter(function(a) { return a.id !== 'casco'; }).forEach(function(a) {
+        const visto = descubiertos.has(a.id);
+        rejilla.appendChild(crear('div', { class: 'tarjeta' },
+            crear('h4', null,
+                EMOJI_LUGAR[a.id] + ' ' + a.nombre,
+                crear('span', { class: 'insignia' + (visto ? ' ok' : ''), texto: visto ? '✓ Descubierto' : 'Sin descubrir' })
+            ),
+            crear('p', { texto: resumir(a.leyenda, 150) }),
+            crear('div', { class: 'fila-botones' },
+                boton('🧊 Ver en 3D', 'btn-chico', function() { verEnVisor(a.id); }),
+                botonAudio(a.id)
+            )
+        ));
+    });
+    c.appendChild(rejilla);
+
+    c.appendChild(crear('p', {
+        class: 'nota pendiente',
+        texto: 'Coordenadas GPS propias de cada animal: pendientes de completar. Forman parte del conjunto del Casco del Minero.'
+    }));
+}
+
+function renderTurismo(c) {
+    c.appendChild(crear('h3', { texto: 'Cómo llegar' }));
+    c.appendChild(crearFichaUbicacion('casco'));
+
+    c.appendChild(crear('h3', { texto: 'Altitud y recomendación' }));
+    c.appendChild(crear('p', { texto: ALTITUD_CIUDAD.texto + '.' }));
+    c.appendChild(crear('p', {
+        class: 'nota',
+        texto: 'Recomendación general: a esta altitud conviene caminar con calma y beber agua. No es un dato propio del monumento.'
+    }));
+
+    c.appendChild(crear('h3', { texto: 'Cerca del monumento' }));
+    const km = distanciaKm(GEO.casco, ESTACION_CASCO);
+    c.appendChild(crear('p', null,
+        'Parada ferroviaria «' + ESTACION_CASCO.nombre + '» (Ferroviaria Andina), a unos ' + formatearDistancia(km) +
+        ' en línea recta según OpenStreetMap. Verifica con el operador si hay servicio. ',
+        enlace('Ver parada', urlGoogleMaps(ESTACION_CASCO), ''),
+        ' · ',
+        enlace('Fuente', FUENTE_OSM_ESTACION.url, '')
+    ));
+
+    c.appendChild(crear('h3', { texto: 'Datos pendientes de completar' }));
+    const pendientes = [
+        'Horarios de visita y de la sala de exposición del Carnaval.',
+        'Costo de ingreso, si lo hubiera.',
+        'Teléfono o correo de la oficina de turismo del Gobierno Autónomo Municipal de Oruro.',
+        'Accesibilidad del lugar.',
+        'Altitud medida en el monumento.',
+        'Coordenadas GPS propias de hormiga, serpiente, sapo y lagarto.',
+        'Fotografías históricas con autor y fuente.'
+    ];
+    const ul = crear('ul');
+    pendientes.forEach(function(t) { ul.appendChild(crear('li', { class: 'pendiente', texto: '• ' + t })); });
+    c.appendChild(ul);
+
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        boton('🗺️ Abrir el mapa', 'btn-chico', function() { abrirSeccion('mapa'); })
+    ));
+}
+
+function renderGaleria(c) {
+    c.appendChild(crear('p', {
+        texto: 'Fotografías del monumento con su autor y su página de origen en Wikimedia Commons. Toca una imagen para ampliarla.'
+    }));
+
+    const grande = crear('div', { class: 'galeria-grande' });
+    const galeria = crear('div', { class: 'galeria' });
+
+    GALERIA.forEach(function(f) {
+        const img = crear('img', { src: f.url, alt: f.titulo, loading: 'lazy' });
+        const fig = crear('figure', { title: f.titulo }, img, crear('figcaption', { texto: f.titulo + ' (' + f.anio + ')' }));
+
+        img.onerror = function() {
+            fig.style.cursor = 'default';
+            fig.replaceChildren(crear('figcaption', { texto: 'No se pudo cargar la imagen (¿sin conexión?).' }));
+        };
+        fig.addEventListener('click', function() {
+            if (!fig.querySelector('img')) return;
+            grande.replaceChildren(
+                crear('img', { src: f.url, alt: f.titulo }),
+                crear('p', null,
+                    f.titulo + ' · Autor: ' + f.autor + ' · ' + f.anio + ' · ',
+                    enlace('ver página original y licencia', f.pagina, '')
+                )
+            );
+        });
+        galeria.appendChild(fig);
+    });
+
+    c.appendChild(galeria);
+    c.appendChild(grande);
+
+    c.appendChild(crear('h3', { texto: 'Fotografías históricas' }));
+    c.appendChild(crear('p', {
+        class: 'pendiente',
+        texto: 'Pendiente de completar: todavía no hay fotografías históricas verificadas en el proyecto. Se agregan en la lista GALERIA de plazaCasco.js con su autor y su fuente.'
+    }));
+}
+
+function renderTiempo(c) {
+    c.appendChild(crear('p', { texto: 'Acontecimientos de la ciudad, del Carnaval y del monumento. Cada hito indica su fuente.' }));
+    c.appendChild(crearLineaTiempo());
+}
+
+function renderDescubrimientos(c) {
+    const total = ANIMALES.length;
+    const n = descubiertos.size;
+    c.appendChild(crear('h3', { texto: n + ' de ' + total + ' lugares descubiertos' }));
+    const barra = crear('div', { class: 'progreso' }, crear('span'));
+    barra.firstChild.style.width = Math.round((n / Math.max(1, total)) * 100) + '%';
+    c.appendChild(barra);
+    c.appendChild(crear('p', {
+        class: 'nota',
+        texto: 'Se descubre un lugar al acercarte a él, al abrir su visor 3D o al pasar por él en la visita guiada. El progreso se guarda en este navegador.'
+    }));
+
+    const ul = crear('ul');
+    ANIMALES.forEach(function(a) {
+        const visto = descubiertos.has(a.id);
+        ul.appendChild(crear('li', null,
+            crear('strong', { texto: (visto ? '✅ ' : '⬜ ') + EMOJI_LUGAR[a.id] + ' ' + a.nombre }),
+            ' ',
+            boton('Ir', 'btn-chico sec', function() { verEnVisor(a.id); })
+        ));
+    });
+    c.appendChild(ul);
+
+    c.appendChild(crear('div', { class: 'fila-botones' },
+        boton('🧭 Iniciar visita guiada', 'btn-chico', function() { iniciarTour(); }),
+        boton('↺ Reiniciar descubrimientos', 'btn-chico sec', function() {
+            if (!window.confirm('¿Borrar los lugares descubiertos?')) return;
+            descubiertos.clear();
+            guardarDescubrimientos();
+            actualizarIndicadorExploracion();
+            renderSeccion('descubrimientos', {}, true);
+        })
+    ));
+}
+
+const SECCIONES = {
+    historia:        { titulo: 'Historia',               icono: '📜', render: renderHistoria,        claves: 'casco minero origen significado virgen socavon' },
+    monumentos:      { titulo: 'Monumentos',             icono: '🗿', render: renderMonumentos,      claves: 'casco del minero escultura plaza ubicacion' },
+    cultura:         { titulo: 'Cultura',                icono: '🎭', render: renderCultura,         claves: 'carnaval diablada leyenda plagas nusta huari unesco oruro' },
+    animales:        { titulo: 'Animales',               icono: '🐍', render: renderAnimales,        claves: 'plagas hormiga serpiente sapo lagarto' },
+    turismo:         { titulo: 'Información turística',  icono: 'ℹ️', render: renderTurismo,         claves: 'como llegar altitud estacion horarios visitar' },
+    galeria:         { titulo: 'Galería fotográfica',    icono: '🖼️', render: renderGaleria,         claves: 'fotos imagenes fotografias historicas' },
+    mapa:            { titulo: 'Mapa turístico',         icono: '🗺️', render: renderMapa,            claves: 'ubicacion latitud longitud google maps como llegar mi ubicacion', ancha: true },
+    tiempo:          { titulo: 'Línea de tiempo',        icono: '⏳', render: renderTiempo,          claves: 'cronologia fechas historia acontecimientos' },
+    descubrimientos: { titulo: 'Mis descubrimientos',    icono: '🏆', render: renderDescubrimientos, claves: 'progreso explorados visitados' }
+};
+
+function renderSeccion(nombre, opciones, conservarScroll) {
+    const def = SECCIONES[nombre];
+    const cuerpo = porId('seccionCuerpo');
+    if (!def || !cuerpo) return;
+    const scroll = conservarScroll ? cuerpo.scrollTop : 0;
+    destruirMapa();
+    cuerpo.innerHTML = '';
+    def.render(cuerpo, opciones || {});
+    cuerpo.scrollTop = scroll;
+}
+
+function marcarItemExplorar(nombre) {
+    document.querySelectorAll('.exp-item').forEach(function(b) {
+        b.classList.toggle('activo', b.dataset.seccion === nombre);
+    });
+}
+
+function cerrarMenusFlotantes() {
+    const vistas = porId('listaVistas');
+    const btnVistas = porId('btnMenuVistas');
+    if (vistas) { vistas.classList.remove('abierto'); vistas.setAttribute('aria-hidden', 'true'); }
+    if (btnVistas) btnVistas.setAttribute('aria-expanded', 'false');
+
+    const lista = porId('listaDestinos');
+    const btnDest = porId('btnMenuDestinos');
+    if (lista) lista.hidden = true;
+    if (btnDest) btnDest.setAttribute('aria-expanded', 'false');
+
+    const resultados = porId('resultadosBusqueda');
+    if (resultados) resultados.hidden = true;
+}
+
+function abrirSeccion(nombre, opciones) {
+    const def = SECCIONES[nombre];
+    if (!def) return;
+    if (!explorando || pausado || visorAbierto) return;
+    if (informacionAbierta) window.cerrarInformacion();
+    if (modoFotoActivo) alternarModoFoto(false);
+    if (tourActivo) terminarTour(false);
+
+    detenerAudio();
+    cerrarMenusFlotantes();
+
+    seccionActual = nombre;
+    panelUIAbierto = true;
+    limpiarTeclas();
+    arrastrando = false;
+    vx = 0;
+    vz = 0;
+
+    const panel = porId('panelSeccion');
+    porId('seccionTitulo').textContent = def.icono + ' ' + def.titulo;
+    panel.classList.toggle('ancha', !!def.ancha);
+    renderSeccion(nombre, opciones || {}, false);
+    panel.classList.add('abierto');
+    panel.setAttribute('aria-hidden', 'false');
+    marcarItemExplorar(nombre);
+
+    const btnUbi = porId('btnUbicacion');
+    if (btnUbi) btnUbi.classList.toggle('activo', nombre === 'mapa');
+}
+
+function cerrarSeccion() {
+    if (!panelUIAbierto) return;
+    panelUIAbierto = false;
+    seccionActual = null;
+    detenerAudio();
+
+    const panel = porId('panelSeccion');
+    panel.classList.remove('abierto');
+    panel.setAttribute('aria-hidden', 'true');
+    marcarItemExplorar(null);
+    const btnUbi = porId('btnUbicacion');
+    if (btnUbi) btnUbi.classList.remove('activo');
+    reloj.getDelta();
+
+    setTimeout(function() { if (!panelUIAbierto) destruirMapa(); }, 450);
+}
+
+function alternarSeccion(nombre) {
+    if (panelUIAbierto && seccionActual === nombre) cerrarSeccion();
+    else abrirSeccion(nombre);
+}
+
+function alternarExplorar(forzar) {
+    const boton = porId('btnExplorar');
+    const cuerpo = porId('cuerpoExplorar');
+    const abrir = typeof forzar === 'boolean' ? forzar : !cuerpo.classList.contains('abierto');
+    cuerpo.classList.toggle('abierto', abrir);
+    cuerpo.setAttribute('aria-hidden', String(!abrir));
+    boton.setAttribute('aria-expanded', String(abrir));
+    if (!abrir) { const r = porId('resultadosBusqueda'); if (r) r.hidden = true; }
+}
+
+
+// ======================================
+// IR A UN LUGAR (misma lógica que el menú "Ir a un lugar")
+// ======================================
+
+function irADestino(id) {
+    if (!puedeControlar()) return false;
+    const animal = animalPorId(id);
+    if (!animal) return false;
+    cerrarMenusFlotantes();
+    return enfocarDestino(animal);
+}
+
+
+// ======================================
+// BUSCADOR DE LUGARES TURÍSTICOS
+// ======================================
+
+let indiceBusqueda = null;
+
+function obtenerIndiceBusqueda() {
+    if (indiceBusqueda) return indiceBusqueda;
+    const lugares = ANIMALES.map(function(a) {
+        return {
+            tipo: 'lugar', id: a.id, nombre: a.nombre,
+            etiqueta: a.id === 'casco' ? 'Monumento' : 'Animal',
+            texto: normalizarTexto([a.nombre, a.leyenda, a.explicacion].join(' '))
+        };
+    });
+    const secciones = Object.keys(SECCIONES).map(function(k) {
+        return {
+            tipo: 'seccion', id: k, nombre: SECCIONES[k].titulo, etiqueta: 'Sección',
+            texto: normalizarTexto(SECCIONES[k].titulo + ' ' + (SECCIONES[k].claves || ''))
+        };
+    });
+    indiceBusqueda = lugares.concat(secciones);
+    return indiceBusqueda;
+}
+
+function elegirResultadoBusqueda(item) {
+    porId('resultadosBusqueda').hidden = true;
+    porId('buscador').value = '';
+    if (esPantallaChica()) alternarExplorar(false);
+    if (item.tipo === 'lugar') {
+        if (panelUIAbierto) cerrarSeccion();
+        irADestino(item.id);
+    } else {
+        abrirSeccion(item.id);
+    }
+}
+
+function buscarLugares(consulta) {
+    const q = normalizarTexto(consulta).trim();
+    if (!q) return [];
+    return obtenerIndiceBusqueda()
+        .filter(function(i) { return i.texto.includes(q); })
+        .sort(function(a, b) {
+            const pa = normalizarTexto(a.nombre).startsWith(q) ? 0 : 1;
+            const pb = normalizarTexto(b.nombre).startsWith(q) ? 0 : 1;
+            if (pa !== pb) return pa - pb;
+            return (a.tipo === 'lugar' ? 0 : 1) - (b.tipo === 'lugar' ? 0 : 1);
+        })
+        .slice(0, 8);
+}
+
+function pintarResultadosBusqueda(resultados, consulta) {
+    const ul = porId('resultadosBusqueda');
+    ul.innerHTML = '';
+    if (!consulta.trim()) { ul.hidden = true; return; }
+
+    if (!resultados.length) {
+        ul.appendChild(crear('li', { class: 'sin-resultados', texto: 'Sin resultados para «' + consulta + '».' }));
+    } else {
+        resultados.forEach(function(item) {
+            const icono = item.tipo === 'lugar' ? (EMOJI_LUGAR[item.id] || '📍') : SECCIONES[item.id].icono;
+            const b = crear('button', { type: 'button' }, icono + ' ' + item.nombre, crear('small', { texto: item.etiqueta }));
+            b.addEventListener('click', function() { elegirResultadoBusqueda(item); });
+            ul.appendChild(crear('li', null, b));
+        });
+    }
+    ul.hidden = false;
+}
+
+function configurarBuscador() {
+    const campo = porId('buscador');
+    let resultados = [];
+
+    campo.addEventListener('input', function() {
+        resultados = buscarLugares(campo.value);
+        pintarResultadosBusqueda(resultados, campo.value);
+    });
+    campo.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && resultados.length) {
+            e.preventDefault();
+            elegirResultadoBusqueda(resultados[0]);
+        } else if (e.key === 'Escape') {
+            e.stopPropagation();
+            campo.value = '';
+            pintarResultadosBusqueda([], '');
+            campo.blur();
+        }
+    });
+}
+
+
+// ======================================
+// VISITA GUIADA
+// ======================================
+
+const RUTA_TOUR = ['casco', 'hormiga', 'serpiente', 'sapo', 'lagarto'];
+let tourActivo = false;
+let tourIndice = 0;
+
+function textoParada(animal) {
+    return resumir(animal.leyenda, 380);
+}
+
+function moverCamaraTour(animal) {
+    if (!camara || !animal.posicion) return;
+    if (!vistaFija) {
+        camara.getWorldDirection(_vMira);
+        miraActual.copy(camara.position).addScaledVector(_vMira, 5);
+    }
+    destinoInfoPendiente = null;
+    const x = animal.posicion.x;
+    const z = animal.posicion.z;
+    vistaFija = animal.id === 'casco'
+        ? { nombre: animal.nombre, pos: [x, 3.6, z + 8.5], mira: [x, 1.9, z] }
+        : { nombre: animal.nombre, pos: [x, 4.5, z + 5], mira: [x, 1.5, z] };
+    marcarBotonVista(null);
+}
+
+function narrarParada() {
+    const animal = animalPorId(RUTA_TOUR[tourIndice]);
+    if (!animal) return;
+    const indice = tourIndice;
+    hablar(animal.nombre + '. ' + textoParada(animal), 'tour', function() {
+        if (!tourActivo || !porId('tourAuto').checked) return;
+        setTimeout(function() {
+            if (tourActivo && tourIndice === indice) siguienteParada();
+        }, 1200);
+    });
+}
+
+function irAParada(i) {
+    const animal = animalPorId(RUTA_TOUR[i]);
+    if (!animal) return;
+    tourIndice = i;
+    detenerAudio();
+    moverCamaraTour(animal);
+    registrarDescubrimiento(animal.id);
+    lugarForzado = animal.nombre;
+
+    porId('tourParada').textContent = 'Parada ' + (i + 1) + '/' + RUTA_TOUR.length;
+    porId('tourTitulo').textContent = EMOJI_LUGAR[animal.id] + ' ' + animal.nombre;
+    porId('tourTexto').textContent = textoParada(animal);
+    porId('tourAnterior').disabled = i === 0;
+    porId('tourSiguiente').textContent = i === RUTA_TOUR.length - 1 ? 'Finalizar ✓' : 'Siguiente ▶';
+    actualizarBotonesAudio();
+
+    if (porId('tourAuto').checked) narrarParada();
+}
+
+function siguienteParada() {
+    if (!tourActivo) return;
+    if (tourIndice >= RUTA_TOUR.length - 1) {
+        terminarTour(true);
+        mostrarToast('🎉 Visita guiada completada');
+        return;
+    }
+    irAParada(tourIndice + 1);
+}
+
+function anteriorParada() {
+    if (!tourActivo || tourIndice === 0) return;
+    irAParada(tourIndice - 1);
+}
+
+function iniciarTour() {
+    if (panelUIAbierto) cerrarSeccion();
+    if (modoFotoActivo) alternarModoFoto(false);
+    if (!puedeControlar()) return;
+
+    cerrarMenusFlotantes();
+    tourActivo = true;
+    document.body.classList.add('en-tour');
+    const card = porId('tourCard');
+    card.classList.add('abierto');
+    card.setAttribute('aria-hidden', 'false');
+    porId('btnVisita').classList.add('activo');
+    irAParada(0);
+}
+
+function terminarTour(volverAlPersonaje) {
+    if (!tourActivo) return;
+    tourActivo = false;
+    detenerAudio();
+    lugarForzado = null;
+    document.body.classList.remove('en-tour');
+    const card = porId('tourCard');
+    card.classList.remove('abierto');
+    card.setAttribute('aria-hidden', 'true');
+    porId('btnVisita').classList.remove('activo');
+    if (volverAlPersonaje) elegirVista('Digit0');
+}
+
+// Si el visitante mueve al personaje o elige otra cámara, la visita guiada termina sola
+function alLiberarVista() {
+    if (tourActivo) terminarTour(false);
+}
+
+
+// ======================================
+// MODO FOTOGRAFÍA
+// ======================================
+
+let modoFotoActivo = false;
+
+function alternarModoFoto(forzar) {
+    if (!explorando) return;
+    const activar = typeof forzar === 'boolean' ? forzar : !modoFotoActivo;
+    if (activar === modoFotoActivo) return;
+    modoFotoActivo = activar;
+
+    if (activar) {
+        if (panelUIAbierto) cerrarSeccion();
+        cerrarMenusFlotantes();
+        alternarExplorar(false);
+        mostrarToast('📷 Modo foto: pulsa F o ESC para mostrar la interfaz');
+    }
+    document.body.classList.toggle('modo-foto', activar);
+    porId('controlesFoto').setAttribute('aria-hidden', String(!activar));
+}
+
+function capturarFoto() {
+    try {
+        if (composer) composer.render(); else renderizador.render(escena, camara);
+        const url = renderizador.domElement.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'oruro-casco-del-minero.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        mostrarToast('📸 Foto guardada');
+    } catch (e) {
+        console.warn('No se pudo capturar la foto:', e);
+        mostrarToast('No se pudo guardar la foto en este navegador.', 'aviso');
+    }
+}
+
+
+// ======================================
+// AYUDA DE CONTROLES
+// ======================================
+
+let temporizadorAyuda = null;
+
+function alternarAyuda(forzar) {
+    const caja = porId('instrucciones');
+    const mostrar = typeof forzar === 'boolean' ? forzar : !caja.classList.contains('visible');
+    caja.classList.toggle('visible', mostrar);
+    clearTimeout(temporizadorAyuda);
+    if (mostrar) temporizadorAyuda = setTimeout(function() { caja.classList.remove('visible'); }, 14000);
+}
+
+function mostrarAyudaInicial() {
+    alternarAyuda(true);
+    clearTimeout(temporizadorAyuda);
+    temporizadorAyuda = setTimeout(function() { porId('instrucciones').classList.remove('visible'); }, 9000);
+}
+
+function alIniciarExploracion() {
+    document.body.classList.add('explorando');
+    actualizarIndicadorExploracion();
+    setTimeout(function() { mostrarToast('Bienvenido a Oruro · abre EXPLORAR para conocer el lugar'); }, 700);
+}
+
+
+// ======================================
+// VISOR 3D: SECCIONES TURÍSTICAS (datos curiosos, ubicación, audio)
+// ======================================
+
+function agregarSeccionesTurismo(cont, animal) {
+    const curiosidades = CURIOSIDADES[animal.id];
+    if (curiosidades && curiosidades.length) {
+        cont.appendChild(crear('h3', { texto: 'Datos curiosos' }));
+        const ul = crear('ul');
+        curiosidades.forEach(function(t) { ul.appendChild(crear('li', { texto: '• ' + t })); });
+        cont.appendChild(ul);
+    }
+
+    cont.appendChild(crear('div', { class: 'fila-botones' }, botonAudio(animal.id)));
+
+    cont.appendChild(crear('h3', { texto: 'Ubicación geográfica' }));
+    cont.appendChild(crearFichaUbicacion(animal.id));
+
+    if (!animal.foto) {
+        cont.appendChild(crear('p', {
+            class: 'nota pendiente',
+            texto: 'Fotografía: pendiente de completar (campo foto en ANIMALES).'
+        }));
+    }
+}
+
+
+// ======================================
+// CONEXIÓN DE LA INTERFAZ (se ejecuta una sola vez desde iniciarEscena)
+// ======================================
+
+function iniciarInterfazTurismo() {
+
+    // --- Explorar ---
+    const btnExplorar = porId('btnExplorar');
+    btnExplorar.addEventListener('click', function() { alternarExplorar(); btnExplorar.blur(); });
+
+    document.querySelectorAll('.exp-item').forEach(function(b) {
+        b.addEventListener('click', function() {
+            alternarSeccion(b.dataset.seccion);
+            b.blur();
+            if (esPantallaChica()) alternarExplorar(false);
+        });
+    });
+
+    porId('btnCerrarSeccion').addEventListener('click', function() { cerrarSeccion(); });
+    configurarBuscador();
+
+    // --- Barra superior ---
+    porId('btnUbicacion').addEventListener('click', function(e) { alternarSeccion('mapa'); e.currentTarget.blur(); });
+    porId('indicadorExploracion').addEventListener('click', function(e) { alternarSeccion('descubrimientos'); e.currentTarget.blur(); });
+    porId('btnFoto').addEventListener('click', function(e) { alternarModoFoto(true); e.currentTarget.blur(); });
+    porId('btnAyuda').addEventListener('click', function(e) { alternarAyuda(); e.currentTarget.blur(); });
+    porId('btnVisita').addEventListener('click', function(e) {
+        if (tourActivo) terminarTour(true); else iniciarTour();
+        e.currentTarget.blur();
+    });
+
+    // --- Menú de cámaras (desplegable) ---
+    const btnVistas = porId('btnMenuVistas');
+    const listaVistas = porId('listaVistas');
+    btnVistas.addEventListener('click', function() {
+        const abrir = !listaVistas.classList.contains('abierto');
+        listaVistas.classList.toggle('abierto', abrir);
+        listaVistas.setAttribute('aria-hidden', String(!abrir));
+        btnVistas.setAttribute('aria-expanded', String(abrir));
+        btnVistas.blur();
+    });
+    listaVistas.querySelectorAll('.vista-btn').forEach(function(b) {
+        b.addEventListener('click', function() {
+            listaVistas.classList.remove('abierto');
+            listaVistas.setAttribute('aria-hidden', 'true');
+            btnVistas.setAttribute('aria-expanded', 'false');
+        });
+    });
+    document.addEventListener('pointerdown', function(e) {
+        if (!porId('panelVistas').contains(e.target)) {
+            listaVistas.classList.remove('abierto');
+            listaVistas.setAttribute('aria-hidden', 'true');
+            btnVistas.setAttribute('aria-expanded', 'false');
+        }
+        const caja = porId('buscador');
+        if (caja && !porId('cuerpoExplorar').contains(e.target)) porId('resultadosBusqueda').hidden = true;
+    });
+
+    // --- Visita guiada ---
+    porId('tourSalir').addEventListener('click', function() { terminarTour(true); });
+    porId('tourAnterior').addEventListener('click', function(e) { anteriorParada(); e.currentTarget.blur(); });
+    porId('tourSiguiente').addEventListener('click', function(e) { siguienteParada(); e.currentTarget.blur(); });
+    porId('tourAudio').addEventListener('click', function(e) {
+        if (audioHablando && audioClave === 'tour') detenerAudio(); else narrarParada();
+        e.currentTarget.blur();
+    });
+    porId('tourVer3D').addEventListener('click', function(e) {
+        const animal = animalPorId(RUTA_TOUR[tourIndice]);
+        e.currentTarget.blur();
+        if (!animal || visorAbierto) return;
+        detenerAudio();
+        abrirVisor(animal);
+    });
+    porId('tourAuto').addEventListener('change', function(e) {
+        if (e.currentTarget.checked && tourActivo && !audioHablando) narrarParada();
+        if (!e.currentTarget.checked && audioClave === 'tour') detenerAudio();
+        e.currentTarget.blur();
+    });
+
+    // --- Modo foto ---
+    porId('fotoCapturar').addEventListener('click', function(e) { capturarFoto(); e.currentTarget.blur(); });
+    porId('fotoSalir').addEventListener('click', function(e) { alternarModoFoto(false); e.currentTarget.blur(); });
+
+    // --- Panel de información general (tecla E) ---
+    porId('btnInfoMas').addEventListener('click', function() {
+        window.cerrarInformacion();
+        abrirSeccion('monumentos');
+    });
+
+    // --- Tocar la escena cierra el panel abierto y quita el foco de los campos ---
+    renderizador.domElement.addEventListener('pointerdown', function() {
+        const activo = document.activeElement;
+        if (activo && activo !== document.body && activo.blur) activo.blur();
+        if (panelUIAbierto) cerrarSeccion();
+        cerrarMenusFlotantes();
+    });
+
+    // Las voces de síntesis se cargan de forma asíncrona en algunos navegadores
+    if ('speechSynthesis' in window && window.speechSynthesis.addEventListener) {
+        window.speechSynthesis.addEventListener('voiceschanged', function() { /* se vuelve a elegir al hablar */ });
+    }
+
+    actualizarIndicadorExploracion();
+}
+
 
 iniciarEscena();

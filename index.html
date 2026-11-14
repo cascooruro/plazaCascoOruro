@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gobierno Autónomo Municipal de Oruro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gobierno Autónomo Municipal de Oruro · Turismo virtual 3D</title>
 
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,17 +25,66 @@
 
 <body>
 
+<!-- ======================= ESCENARIO 3D ======================= -->
 <div id="contenedor"></div>
 <div id="cargando">Preparando la experiencia...</div>
 
-<nav>
-    <div class="logo">ORURO</div>
-    <div>
-        <a href="index.html">INICIO</a>
-        <a href="cultura.html">CULTURA</a>
-    </div>
-</nav>
+<!-- ======================= BARRA SUPERIOR ======================= -->
+<header id="barraSuperior">
 
+    <!-- Parte superior izquierda: logotipo, lugar actual e indicador de exploración -->
+    <div id="marca">
+        <div class="logo">ORURO</div>
+        <div id="lugarActual" class="solo-explorando" aria-live="polite">
+            <span class="lugar-pin" aria-hidden="true">📍</span>
+            <span id="lugarNombre">Plaza del Casco del Minero</span>
+        </div>
+        <button id="indicadorExploracion" class="solo-explorando" type="button"
+                title="Ver mis descubrimientos" tabindex="-1">
+            <span class="ind-barra"><span id="indBarraRelleno"></span></span>
+            <span id="indTexto">Exploración 0/5</span>
+        </button>
+    </div>
+
+    <!-- Parte superior derecha: INICIO, CULTURA, lugares, mapa y herramientas -->
+    <nav id="barraDerecha" aria-label="Navegación principal">
+        <a class="nav-link" href="index.html">INICIO</a>
+        <a class="nav-link" href="cultura.html">CULTURA</a>
+
+        <div id="menuDestinos">
+            <button id="btnMenuDestinos" type="button" aria-expanded="false" aria-controls="listaDestinos">
+                <span>Ir a un lugar</span> <span aria-hidden="true">▾</span>
+            </button>
+            <div id="listaDestinos" hidden>
+                <button type="button" data-destino="sapo">🐸 Sapo</button>
+                <button type="button" data-destino="lagarto">🦎 Lagarto</button>
+                <button type="button" data-destino="hormiga">🐜 Hormiga</button>
+                <button type="button" data-destino="serpiente">🐍 Serpiente</button>
+                <button type="button" data-destino="casco">⛑️ Casco del Minero</button>
+                <p id="estadoDestinos" role="status" aria-live="polite"></p>
+            </div>
+        </div>
+
+        <button id="btnUbicacion" class="icono-btn solo-explorando" type="button"
+                title="Mapa y ubicación geográfica (M)" tabindex="-1">
+            <span class="ico" aria-hidden="true">📍</span><span class="etq">Ubicación</span>
+        </button>
+        <button id="btnVisita" class="icono-btn solo-explorando" type="button"
+                title="Visita guiada (G)" tabindex="-1">
+            <span class="ico" aria-hidden="true">🧭</span><span class="etq">Visita guiada</span>
+        </button>
+        <button id="btnFoto" class="icono-btn solo-explorando" type="button"
+                title="Modo fotografía (F)" tabindex="-1">
+            <span class="ico" aria-hidden="true">📷</span><span class="etq">Foto</span>
+        </button>
+        <button id="btnAyuda" class="icono-btn solo-explorando" type="button"
+                title="Controles" aria-label="Ver controles" tabindex="-1">
+            <span class="ico" aria-hidden="true">⌨️</span>
+        </button>
+    </nav>
+</header>
+
+<!-- ======================= PORTADA ======================= -->
 <section id="portada">
     <div class="contenido">
         <h3>Patrimonio Histórico</h3>
@@ -52,18 +101,19 @@
     </div>
 </section>
 
-<div id="instrucciones">
-    <b>W A S D / Flechas táctiles</b> Mover |
-    <b>Shift</b> Correr |
-    <b>Espacio</b> Saltar |
-    <b>Arrastrar mouse</b> Cámara |
-    <b>Rueda</b> Zoom |
-    <b>E</b> Información / Casco |
-    <b>H C S L</b> Animales (cerca de ellos) |
-    <b>1 2 3 4</b> Día / Tarde / Noche / Auto |
-    <b>5-9</b> Vistas de cámara | <b>0</b> Volver al personaje |
-    <b>P</b> Coordenadas |
-    <b>ESC</b> Pausa
+<!-- ======================= CONTROLES (ayuda breve, ya no es un panel permanente) ======================= -->
+<div id="instrucciones" role="note">
+    <h4>Controles</h4>
+    <ul>
+        <li><kbd>W A S D</kbd> / flechas / botones táctiles: mover</li>
+        <li><kbd>Shift</kbd> correr · <kbd>Espacio</kbd> saltar</li>
+        <li><b>Arrastrar</b> cámara · <b>Rueda</b> zoom</li>
+        <li><kbd>E</kbd> información / casco · <kbd>H</kbd> <kbd>C</kbd> <kbd>S</kbd> <kbd>L</kbd> animales (cerca de ellos)</li>
+        <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> día · tarde · noche · auto</li>
+        <li><kbd>5</kbd>–<kbd>9</kbd> vistas de cámara · <kbd>0</kbd> volver al personaje</li>
+        <li><kbd>M</kbd> mapa · <kbd>G</kbd> visita guiada · <kbd>F</kbd> modo foto</li>
+        <li><kbd>P</kbd> coordenadas internas · <kbd>ESC</kbd> cerrar / pausa</li>
+    </ul>
 </div>
 
 <div id="controlesMoviles" aria-label="Controles para mover al personaje">
@@ -75,25 +125,75 @@
 
 <div id="coords"></div>
 
+<!-- ======================= LATERAL IZQUIERDO: EXPLORAR ======================= -->
+<aside id="panelExplorar" class="solo-explorando" aria-label="Explorar">
+    <button id="btnExplorar" type="button" aria-expanded="false" aria-controls="cuerpoExplorar" tabindex="-1">
+        <span class="ico" aria-hidden="true">🧭</span>
+        <span class="txt">EXPLORAR</span>
+        <span class="flecha" aria-hidden="true">▸</span>
+    </button>
+
+    <div id="cuerpoExplorar" aria-hidden="true">
+        <div class="buscador-caja">
+            <input id="buscador" type="search" placeholder="Buscar lugares, temas…"
+                   autocomplete="off" aria-label="Buscar lugares turísticos" aria-controls="resultadosBusqueda">
+            <ul id="resultadosBusqueda" hidden></ul>
+        </div>
+
+        <ul class="exp-lista">
+            <li><button type="button" class="exp-item" data-seccion="historia" tabindex="-1"><span class="ico">📜</span>Historia</button></li>
+            <li><button type="button" class="exp-item" data-seccion="monumentos" tabindex="-1"><span class="ico">🗿</span>Monumentos</button></li>
+            <li><button type="button" class="exp-item" data-seccion="cultura" tabindex="-1"><span class="ico">🎭</span>Cultura</button></li>
+            <li><button type="button" class="exp-item" data-seccion="animales" tabindex="-1"><span class="ico">🐍</span>Animales</button></li>
+            <li><button type="button" class="exp-item" data-seccion="turismo" tabindex="-1"><span class="ico">ℹ️</span>Información turística</button></li>
+            <li><button type="button" class="exp-item" data-seccion="galeria" tabindex="-1"><span class="ico">🖼️</span>Galería fotográfica</button></li>
+        </ul>
+
+        <p class="exp-sub">Herramientas</p>
+        <ul class="exp-lista">
+            <li><button type="button" class="exp-item" data-seccion="mapa" tabindex="-1"><span class="ico">🗺️</span>Mapa turístico</button></li>
+            <li><button type="button" class="exp-item" data-seccion="tiempo" tabindex="-1"><span class="ico">⏳</span>Línea de tiempo</button></li>
+            <li><button type="button" class="exp-item" data-seccion="descubrimientos" tabindex="-1"><span class="ico">🏆</span>Mis descubrimientos</button></li>
+        </ul>
+    </div>
+</aside>
+
+<!-- ======================= PANEL DE CONTENIDO (historia, mapa, galería…) ======================= -->
+<section id="panelSeccion" role="dialog" aria-modal="false" aria-labelledby="seccionTitulo" aria-hidden="true">
+    <div class="seccion-cab">
+        <h2 id="seccionTitulo">Sección</h2>
+        <button id="btnCerrarSeccion" type="button" aria-label="Cerrar panel" tabindex="-1">✕</button>
+    </div>
+    <div id="seccionCuerpo"></div>
+</section>
+
+<!-- ======================= PARTE INFERIOR IZQUIERDA: DÍA / TARDE / NOCHE / AUTO ======================= -->
 <div id="panelAmbiente">
-    <button class="amb-btn" data-amb="dia" tabindex="-1">☀️ Día</button>
-    <button class="amb-btn" data-amb="tarde" tabindex="-1">🌇 Tarde</button>
-    <button class="amb-btn" data-amb="noche" tabindex="-1">🌙 Noche</button>
-    <button class="amb-btn" data-amb="auto" tabindex="-1">🔄 Auto</button>
+    <button class="amb-btn" data-amb="dia" tabindex="-1" title="Día (1)"><span class="ico">☀️</span><span class="etq">Día</span></button>
+    <button class="amb-btn" data-amb="tarde" tabindex="-1" title="Tarde (2)"><span class="ico">🌇</span><span class="etq">Tarde</span></button>
+    <button class="amb-btn" data-amb="noche" tabindex="-1" title="Noche (3)"><span class="ico">🌙</span><span class="etq">Noche</span></button>
+    <button class="amb-btn" data-amb="auto" tabindex="-1" title="Automático (4)"><span class="ico">🔄</span><span class="etq">Auto</span></button>
 </div>
 
+<!-- ======================= PARTE INFERIOR DERECHA: CÁMARAS (menú desplegable) ======================= -->
 <div id="panelVistas">
-    <button class="vista-btn" data-vista="Digit5" tabindex="-1">5 · Arriba</button>
-    <button class="vista-btn" data-vista="Digit6" tabindex="-1">6 · Frente</button>
-    <button class="vista-btn" data-vista="Digit7" tabindex="-1">7 · Lado</button>
-    <button class="vista-btn" data-vista="Digit8" tabindex="-1">8 · Atrás</button>
-    <button class="vista-btn" data-vista="Digit9" tabindex="-1">9 · Panorama</button>
-    <button class="vista-btn" data-vista="Digit0" tabindex="-1">0 · Personaje</button>
+    <button id="btnMenuVistas" type="button" aria-expanded="false" aria-controls="listaVistas" tabindex="-1">
+        <span class="ico" aria-hidden="true">🎥</span><span class="etq">Cámaras</span><span aria-hidden="true">▴</span>
+    </button>
+    <div id="listaVistas" aria-hidden="true">
+        <button class="vista-btn" data-vista="Digit5" tabindex="-1">5 · Vista superior</button>
+        <button class="vista-btn" data-vista="Digit6" tabindex="-1">6 · Vista frontal</button>
+        <button class="vista-btn" data-vista="Digit7" tabindex="-1">7 · Vista lateral</button>
+        <button class="vista-btn" data-vista="Digit8" tabindex="-1">8 · Vista trasera</button>
+        <button class="vista-btn" data-vista="Digit9" tabindex="-1">9 · Vista panorámica</button>
+        <button class="vista-btn" data-vista="Digit0" tabindex="-1">0 · Volver al personaje</button>
+    </div>
 </div>
 
 <div id="ytPlayer"></div>
 <button id="btnMusica" tabindex="-1">🔇 Música apagada</button>
 
+<!-- ======================= INDICADOR DE INTERACCIÓN (solo cerca de un objeto) ======================= -->
 <div id="avisoAnimal">
     <span class="tecla" id="avisoLetra">H</span>
     <div>
@@ -102,38 +202,51 @@
     </div>
 </div>
 
+<!-- ======================= MARCADORES DE DESTINOS (id corregido) ======================= -->
 <div id="marcadoresDestinos" aria-label="Puntos de interés">
-    <button class="destino-marcador" type="button" data-marcador="hormiga" aria-label="Ver Hormiga">
+    <button class="destino-marcador" type="button" data-marcador="hormiga" aria-label="Ver Hormiga" tabindex="-1">
         <span class="destino-punto"></span><span class="destino-etiqueta">Hormiga</span>
     </button>
-    <button class="destino-marcador" type="button" data-marcador="serpiente" aria-label="Ver Serpiente">
+    <button class="destino-marcador" type="button" data-marcador="serpiente" aria-label="Ver Serpiente" tabindex="-1">
         <span class="destino-punto"></span><span class="destino-etiqueta">Serpiente</span>
     </button>
-    <button class="destino-marcador" type="button" data-marcador="sapo" aria-label="Ver Sapo">
+    <button class="destino-marcador" type="button" data-marcador="sapo" aria-label="Ver Sapo" tabindex="-1">
         <span class="destino-punto"></span><span class="destino-etiqueta">Sapo</span>
     </button>
-    <button class="destino-marcador" type="button" data-marcador="lagarto" aria-label="Ver Lagarto">
+    <button class="destino-marcador" type="button" data-marcador="lagarto" aria-label="Ver Lagarto" tabindex="-1">
         <span class="destino-punto"></span><span class="destino-etiqueta">Lagarto</span>
     </button>
-    <button class="destino-marcador" type="button" data-marcador="casco" aria-label="Ver Casco del Minero">
+    <button class="destino-marcador" type="button" data-marcador="casco" aria-label="Ver Casco del Minero" tabindex="-1">
         <span class="destino-punto"></span><span class="destino-etiqueta">Casco del Minero</span>
     </button>
 </div>
 
-<div id="menuDestinos">
-    <button id="btnMenuDestinos" type="button" aria-expanded="false" aria-controls="listaDestinos">
-        Ir a un lugar <span aria-hidden="true">▾</span>
-    </button>
-    <div id="listaDestinos" hidden>
-        <button type="button" data-destino="sapo">Sapo</button>
-        <button type="button" data-destino="lagarto">Lagarto</button>
-        <button type="button" data-destino="hormiga">Hormiga</button>
-        <button type="button" data-destino="serpiente">Serpiente</button>
-        <button type="button" data-destino="casco">Casco del Minero</button>
-        <p id="estadoDestinos" role="status" aria-live="polite"></p>
+<!-- ======================= VISITA GUIADA ======================= -->
+<div id="tourCard" role="region" aria-label="Visita guiada" aria-hidden="true">
+    <div class="tour-cab">
+        <span id="tourParada" class="tour-parada">Parada 1/5</span>
+        <button id="tourSalir" type="button" class="tour-x" aria-label="Salir de la visita guiada" tabindex="-1">✕</button>
+    </div>
+    <h3 id="tourTitulo">Casco del Minero</h3>
+    <p id="tourTexto"></p>
+    <label class="tour-auto"><input type="checkbox" id="tourAuto"> Narración automática (avanza sola)</label>
+    <div class="tour-botones">
+        <button id="tourAnterior" type="button" tabindex="-1">◀ Anterior</button>
+        <button id="tourAudio" type="button" tabindex="-1" data-audio="tour">🔊 Escuchar</button>
+        <button id="tourVer3D" type="button" tabindex="-1">🧊 Ver en 3D</button>
+        <button id="tourSiguiente" type="button" tabindex="-1">Siguiente ▶</button>
     </div>
 </div>
 
+<!-- ======================= MODO FOTOGRAFÍA ======================= -->
+<div id="controlesFoto" aria-hidden="true">
+    <button id="fotoCapturar" type="button" tabindex="-1">📸 Capturar</button>
+    <button id="fotoSalir" type="button" class="btn-sec" tabindex="-1">✕ Mostrar interfaz</button>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<!-- ======================= VISOR 3D (conservado) ======================= -->
 <div id="visor">
     <div class="visor-caja">
         <div class="visor-cabecera">
@@ -158,7 +271,10 @@
         Es un símbolo importante de nuestra cultura.
     </p>
     <br>
-    <button onclick="cerrarInformacion()">Cerrar</button>
+    <div class="info-botones">
+        <button id="btnInfoMas" type="button">Ver ficha completa</button>
+        <button class="btn-sec" onclick="cerrarInformacion()">Cerrar</button>
+    </div>
 </div>
 
 <div id="pausa">
