@@ -6,7 +6,8 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
@@ -21,16 +22,16 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 // ======================================
 
 const CFG = {
-    alturaPersonaje: 0.0255, // ANTES 0.085 (-70%)
-    tamanoMapa: 300,   // ANTES 150. Súbelo para agrandar la plaza respecto al personaje
+    alturaPersonaje: 0.00162,
+    tamanoMapa: 150,
     alturaCamaraObjetivo: 1.1,
-    velocidad: 1.0,           // caminar
-    velocidadCorrer: 1.7,     // con Shift
+    velocidad: 2.0,           // caminar
+    velocidadCorrer: 3.2,     // con Shift
     gravedad: 12,
-    fuerzaSalto: 1.75,        // ANTES 3.2 (proporcional al personaje más pequeño)
-    alturaEscalon: 0.018,     // ANTES 0.06
+    fuerzaSalto: 3.2,
+    alturaEscalon: 0.06,
     distanciaActivacion: 1.2, // distancia por defecto a la que aparece la letra
-    pixelRatioMax: 1.0,       // evita renderizar más píxeles de los que suelen ser necesarios
+    pixelRatioMax: 1.25,      // mayor nitidez en equipos capaces; se reduce automáticamente si hace falta
     pixelRatioMin: 0.65,      // resolución mínima a la que puede bajar
     meteoros: 25,             // cantidad de meteoritos (bájalo si va lento)
     anisotropia: 4,           // calidad de texturas lejanas
@@ -46,7 +47,7 @@ const CFG = {
 const MODO_REPOSO = 'absoluto';
 const CORRECCION_REPOSO_GRADOS = { x: 0, y: 0, z: 0 };
 
-const radioJugador = Math.max(0.024, CFG.alturaPersonaje * 0.25);
+const radioJugador = Math.max(0.0011, CFG.alturaPersonaje * 0.5);
 
 
 // ======================================
@@ -301,6 +302,16 @@ function ajustarCoordenadasAlMapa(centroAnterior, centroActual, escala) {
 
     ANIMALES.forEach(function(animal) {
         if (!animal.posicion) return;
+        if (animal.posicionMarcador) {
+            const marcador = transformarPuntoMapa(
+                animal.posicionMarcador.x,
+                animal.posicionMarcador.y,
+                animal.posicionMarcador.z
+            );
+            animal.posicionMarcador.x = marcador.x;
+            animal.posicionMarcador.y = marcador.y;
+            animal.posicionMarcador.z = marcador.z;
+        }
         const punto = transformarPuntoMapa(animal.posicion.x, 0, animal.posicion.z);
         animal.posicion.x = punto.x;
         animal.posicion.z = punto.z;
@@ -335,7 +346,7 @@ const marcadoresDestinos = Array.from(document.querySelectorAll('[data-marcador]
 // VARIABLES
 // ======================================
 
-let escena, camara, renderizador, composer, outlinePass;
+let escena, camara, renderizador, composer;
 let jugador, modeloPersonaje, grupoMapa, mixer;
 let clipCaminarPersonaje = null;
 const personajesSecundarios = [];
@@ -343,8 +354,6 @@ let accionActual;
 const acciones = {};
 
 const reloj = new THREE.Clock();
-const relojEfectos = new THREE.Clock();
-
 let explorando = false;
 let pausado = false;
 let informacionAbierta = false;
@@ -411,7 +420,7 @@ const CAMARAS = {
         nombre: 'Cinemática',
         dist: 2.2, distMin: 1.2, distMax: 7,
         pitch: 0.15, altura: 1.05,
-        fov: 60, near: 0.05,
+        fov: 48, near: 0.05,
         margen: 0.08, minColision: 0.7
     }
 };
@@ -424,18 +433,18 @@ camaraPitch = CAMARAS[modoCamara].pitch;    // la inclinación inicial coincide 
 
 // Ajusta la cámara cinemática al tamaño REAL del personaje (H = altura en unidades del mundo).
 // Cambia los multiplicadores para encuadrar a tu gusto:
-//   dist   = distancia detrás del personaje (1.3 = como la foto; más chico = más cerca)
+//   dist   = distancia detrás del personaje; el mínimo mantiene el encuadre al reducir el modelo
 //   altura = punto al que mira la cámara    (0.62 = pecho; más grande = personaje más abajo en pantalla)
 function ajustarCamaraCinematicaA(H) {
     const C = CAMARAS.cinematica;
-    C.dist        = H * 1.3;
-    C.distMin     = H * 0.7;
-    C.distMax     = H * 4;
+    C.dist        = Math.max(H * 4.4, 0.24);
+    C.distMin     = Math.max(H * 2.2, 0.12);
+    C.distMax     = Math.max(H * 13.6, 0.75);
     C.altura      = H * 0.62;
     C.pitch       = 0.15;
     C.near        = Math.max(0.005, H * 0.03);
     C.margen      = H * 0.05;
-    C.minColision = H * 0.4;
+    C.minColision = Math.max(H * 0.4, 0.12);
     distPorModo.cinematica = C.dist;
     if (modoCamara === 'cinematica') camaraPitch = C.pitch;
     console.log('Altura real del personaje:', H.toFixed(3), '→ cámara cinemática ajustada');
@@ -467,13 +476,10 @@ let textoCoordsAnterior = '';
 let destinoInfoPendiente = null;
 
 // Calidad adaptativa
-let pixelRatioActual = Math.min(window.devicePixelRatio || 1, CFG.pixelRatioMax);
+let pixelRatioActual = Math.min(Math.max(window.devicePixelRatio || 1, 1.25), CFG.pixelRatioMax);
 let acumTiempo = 0;
 let acumFrames = 0;
 let tiempoMarcadores = 0;
-const ESCALA_CONTORNO = 0.5;
-
-
 // ======================================
 // UTILIDADES
 // ======================================
@@ -546,15 +552,6 @@ function aplicarPixelRatio() {
     renderizador.setPixelRatio(pixelRatioActual);
     composer.setPixelRatio(pixelRatioActual);
     composer.setSize(window.innerWidth, window.innerHeight);
-    ajustarResolucionContorno();
-}
-
-function ajustarResolucionContorno() {
-    if (!outlinePass) return;
-    outlinePass.setSize(
-        Math.max(1, Math.round(window.innerWidth * ESCALA_CONTORNO * pixelRatioActual)),
-        Math.max(1, Math.round(window.innerHeight * ESCALA_CONTORNO * pixelRatioActual))
-    );
 }
 
 function vigilarRendimiento(dtReal) {
@@ -903,16 +900,11 @@ function iniciarEscena() {
     composer.setPixelRatio(pixelRatioActual);
     composer.addPass(new RenderPass(escena, camara));
 
-    outlinePass = new OutlinePass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight), escena, camara
-    );
-    outlinePass.visibleEdgeColor.set(0xd48837);
-    outlinePass.hiddenEdgeColor.set(0x8c5319);
-    outlinePass.edgeStrength = 3.5;
-    outlinePass.edgeGlow = 0.5;
-    outlinePass.edgeThickness = 2;
-    composer.addPass(outlinePass);
-    ajustarResolucionContorno();
+    composer.addPass(new SMAAPass(
+        window.innerWidth * pixelRatioActual,
+        window.innerHeight * pixelRatioActual
+    ));
+    composer.addPass(new OutputPass());
 
     luzAmbiente = new THREE.AmbientLight(0xffffff, 1);
     escena.add(luzAmbiente);
@@ -1029,7 +1021,7 @@ function construirColisiones(mallas, alTerminar) {
 }
 
 function cargarEscenario() {
-    loader.load('CascoOruro.glb?v=3', function(gltf) {
+    loader.load('CascoOruro.glb', function(gltf) {
 
         grupoMapa = gltf.scene;
 
@@ -1118,8 +1110,20 @@ function cargarEscenario() {
 function construirZonasAnimales() {
 
     zonas = [];
+    const altoRayo = limitesMapa.max.y + 10;
+    const distanciaRayo = altoRayo - limitesMapa.min.y + 20;
 
     ANIMALES.forEach(function(animal) {
+        if (animal.posicionMarcador) {
+            const marcador = animal.posicionMarcador;
+            const suelo = golpeSuelo(marcador.x, altoRayo, marcador.z, distanciaRayo);
+            if (suelo) {
+                marcador.y = Math.max(
+                    marcador.y,
+                    suelo.point.y + Math.max(0.6, (animal.activacion || CFG.distanciaActivacion) * 0.5)
+                );
+            }
+        }
 
         let caja = null;
 
@@ -1738,7 +1742,7 @@ function crearClipReposo(clipFBX, fbx) {
 // ======================================
 
 function cargarPersonaje() {
-    loader.load('personaje1.glb?v=3', function(gltf) {
+    loader.load('personaje1.glb', function(gltf) {
 
         modeloPersonaje = gltf.scene;
 
@@ -1773,16 +1777,13 @@ function cargarPersonaje() {
             : new THREE.Box3().setFromObject(jugador).getSize(_vh).y;
         ajustarCamaraCinematicaA(Math.max(alturaReal, 0.01));
 
-        const meshes = [];
         modeloPersonaje.traverse(function(obj) {
             if (obj.isMesh) {
                 obj.castShadow = true;
                 obj.receiveShadow = true;
                 obj.frustumCulled = false;
-                meshes.push(obj);
             }
         });
-        outlinePass.selectedObjects = meshes;
 
         mixer = new THREE.AnimationMixer(modeloPersonaje);
         const anims = gltf.animations || [];
@@ -2184,7 +2185,7 @@ function moverConColisiones(dx, dz) {
     const total = Math.hypot(dx, dz);
     if (total < 1e-6) return false;
 
-    const pasos = Math.max(1, Math.ceil(total / (radioJugador * 0.5)));
+    const pasos = Math.max(1, Math.ceil(total / Math.max(radioJugador * 0.5, 0.012)));
     const px = dx / pasos;
     const pz = dz / pasos;
     let chocoConMuro = false;
@@ -2224,7 +2225,7 @@ function moverConColisiones(dx, dz) {
 
         if ((bloqueadoX || bloqueadoZ) && !seMovioEnPaso) {
             const direccion = Math.atan2(pz, px);
-            const pasoLateral = Math.min(Math.hypot(px, pz), radioJugador * 0.5);
+            const pasoLateral = Math.min(Math.hypot(px, pz), Math.max(radioJugador * 0.5, 0.008));
             let rodeoEncontrado = false;
 
             for (const lado of [ladoDesvioJugador, -ladoDesvioJugador]) {
@@ -2283,7 +2284,7 @@ function actualizarJugador(dt) {
 
     // ---------- VELOCIDAD CON INERCIA ----------
     const vel = corriendo ? CFG.velocidadCorrer : CFG.velocidad;
-    const k = enSuelo ? 14 : 5;
+    const k = enSuelo ? 18 : 6;
     const f = 1 - Math.exp(-k * dt);
     vx += (dirX * vel - vx) * f;
     vz += (dirZ * vel - vz) * f;
@@ -2838,10 +2839,7 @@ function redimensionar() {
     camara.aspect = window.innerWidth / window.innerHeight;
     camara.updateProjectionMatrix();
     renderizador.setSize(window.innerWidth, window.innerHeight);
-    if (composer) {
-        composer.setSize(window.innerWidth, window.innerHeight);
-        ajustarResolucionContorno();
-    }
+    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
 }
 
 
@@ -2889,12 +2887,6 @@ function animar() {
             textoCoordsAnterior = txt;
             document.getElementById('coords').textContent = txt;
         }
-    }
-
-    if (outlinePass) {
-        const t = relojEfectos.getElapsedTime();
-        outlinePass.edgeStrength = 2.0 + Math.sin(t * 4) * 1.8;
-        outlinePass.edgeGlow = 0.4 + Math.sin(t * 4) * 0.35;
     }
 
     actualizarMeteoros(delta);
