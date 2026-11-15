@@ -446,6 +446,9 @@ kbd {
     box-shadow: 0 0 20px #d6a63b55; animation: pulso 1.6s ease-in-out infinite;
     user-select: none;
 }
+#avisoAnimal.anclado {
+    position: fixed; bottom: auto; transform: translate(-50%, -100%);
+}
 #avisoAnimal:hover { background: #0d2a42; }
 #avisoAnimal .tecla {
     width: 40px; height: 40px; display: grid; place-items: center;

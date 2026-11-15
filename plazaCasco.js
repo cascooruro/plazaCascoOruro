@@ -216,7 +216,7 @@ const ANIMALES = [
         archivos: ['hormiga.glb'],
         buscar: /hormiga|(^|[^a-z])ants?([^a-z]|$)/,
         posicion: { x: -0.36, z: 6.34, radio: 0.4 },
-        posicionMarcador: { x: -2.49, y: 1.95, z: 2.82 },
+        posicionMarcadorMundo: { x: -1.40, y: 2.06, z: 3.12 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Desde el Este llegó un ejército de hormigas que, según el relato, nació de la cabeza del lagarto decapitado. Cuando los urus pedían ayuda a la Ñusta, ella detuvo la plaga y la convirtió en dunas de arena.',
@@ -228,7 +228,7 @@ const ANIMALES = [
         archivos: ['serpiente2.glb'],
         buscar: /serpiente|culebra|snake|cobra|vibora/,
         posicion: { x: 4.82, z: 6.28, radio: 0.4 },
-        posicionMarcador: { x: 5.95, y: 2.28, z: 2.04 },
+        posicionMarcadorMundo: { x: 6.52, y: 2.13, z: 1.62 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Por el Sur apareció una gigantesca víbora entre los cerros. Los urus clamaron a la Ñusta, quien partió su cuerpo con una espada y la dejó convertida en piedra.',
@@ -240,7 +240,7 @@ const ANIMALES = [
         archivos: ['sapo4.glb'],
         buscar: /sapo|toad|frog|(^|[^a-z])rana/,
         posicion: { x: 3.17, z: 8.95, radio: 0.4 },
-        posicionMarcador: { x: 2.25, y: 2.12, z: 5.68 },
+        posicionMarcadorMundo: { x: 2.12, y: 2.20, z: 6.18 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Por el Norte llegó un sapo de tamaño colosal. La Ñusta lo enfrentó con una honda y lo convirtió en piedra.',
@@ -252,7 +252,7 @@ const ANIMALES = [
         archivos: ['lagarto2.glb'],
         buscar: /lagarto|lagartija|lizard|gecko|iguana/,
         posicion: { x: 1.97, z: 4.02, radio: 0.4 },
-        posicionMarcador: { x: 1.98, y: 2.25, z: -0.92 },
+        posicionMarcadorMundo: { x: 2.29, y: 2.43, z: -1.42 },
         activacion: 1.6,
         foto: '', fotoAutor: '', fotoLink: '',
         leyenda: 'Por el Oeste, Huari envió un enorme lagarto, que fue decapitado. Cerca de Oruro, en Cala Cala, hay una laguna cuyas aguas se ven rojizas a cierta hora del día. La leyenda dice que se formó con la sangre del lagarto.',
@@ -263,12 +263,12 @@ const ANIMALES = [
         id: 'casco', nombre: 'Casco del Minero', letra: 'E', tecla: 'KeyE',
         archivos: ['casco.glb'],
         posicion: { x: 2.19, z: 7.31, radio: 0.5 },
-        posicionMarcador: { x: 1.61, y: 2.22, z: 3.47 },
+        posicionMarcadorMundo: { x: 1.65, y: 2.42, z: 2.89 },
         activacion: 1.5,
         tituloLeyenda: 'Historia',
         tituloExplicacion: 'Significado',
         foto: 'https://commons.wikimedia.org/wiki/Special:FilePath/Casco_del_Minero,_Oruro.jpg?width=800',
-        fotoAutor: 'Parallelepiped09 (Wikimedia Commons, 2025)',
+        fotoAutor: 'Parallelepiped09 (CC BY-SA 4.0, Wikimedia Commons, 2025)',
         fotoLink: 'https://es.wikipedia.org/wiki/Archivo:Casco_del_Minero,_Oruro.jpg',
         leyenda: 'El Casco del Minero es una escultura monumental de hojalata y metal, de unos 6 metros, en la zona Norte de Oruro, dentro de la plaza circular por donde se entra a la ciudad desde la doble vía. Es obra del artista Fernando Crespo y forma parte de las esculturas de chatarra que la alcaldía impulsó en la gestión de Edgar Bazán, junto a Finelez Llanque y Tito Yugar, para dar la bienvenida a los visitantes con las danzas del Carnaval. En su superficie aparecen la actividad minera, los palliris, los mineros, los ferrocarriles y las cuatro plagas de la leyenda. En el lugar de la linterna está la imagen de la Virgen del Socavón, patrona de los mineros. El diseño original tenía un dragón encima, pero por su peso se cayó. Ya existía en 2008 y en 2016 se mejoró el lugar con fuentes de agua, jardineras, iluminación LED y una sala de exposición del Carnaval bajo el casco.',
         explicacion: 'El casco une dos ideas de Oruro: la minería, que sostiene su identidad, y la mitología del Carnaval. En las jardineras de la plaza están la víbora, las hormigas, el sapo y el lagarto, por eso los cuatro animales que visitaste forman un solo conjunto con el casco.',
@@ -312,9 +312,14 @@ function ajustarCoordenadasAlMapa(centroAnterior, centroActual, escala) {
             animal.posicionMarcador.y = marcador.y;
             animal.posicionMarcador.z = marcador.z;
         }
-        const punto = transformarPuntoMapa(animal.posicion.x, 0, animal.posicion.z);
-        animal.posicion.x = punto.x;
-        animal.posicion.z = punto.z;
+        if (animal.posicionMarcadorMundo) {
+            animal.posicion.x = animal.posicionMarcadorMundo.x;
+            animal.posicion.z = animal.posicionMarcadorMundo.z;
+        } else {
+            const punto = transformarPuntoMapa(animal.posicion.x, 0, animal.posicion.z);
+            animal.posicion.x = punto.x;
+            animal.posicion.z = punto.z;
+        }
         animal.posicion.radio *= escala;
         animal.activacion *= escala;
     });
@@ -1198,9 +1203,40 @@ function actualizarZonaAnimal() {
         document.getElementById('avisoNombre').textContent = zonaActual.animal.nombre;
         document.getElementById('avisoAccion').textContent = 'Presiona la tecla o haz clic';
         aviso.style.display = 'flex';
+        posicionarAvisoAnimal(aviso, zonaActual.animal);
     } else {
         aviso.style.display = 'none';
+        aviso.classList.remove('anclado');
+        aviso.style.left = '';
+        aviso.style.top = '';
     }
+}
+
+const _posicionAvisoAnimal = new THREE.Vector3();
+
+function posicionarAvisoAnimal(aviso, animal) {
+    const posicion = animal.posicionMarcadorMundo || animal.posicionMarcador;
+    if (!camara || !posicion) return;
+
+    const punto = _posicionAvisoAnimal.set(posicion.x, posicion.y, posicion.z).project(camara);
+    if (punto.z < -1 || punto.z > 1) {
+        aviso.classList.remove('anclado');
+        aviso.style.left = '';
+        aviso.style.top = '';
+        return;
+    }
+
+    const x = (punto.x + 1) * window.innerWidth / 2;
+    const y = (1 - punto.y) * window.innerHeight / 2;
+    const medioAncho = aviso.offsetWidth / 2;
+    const margenHorizontal = medioAncho + 8;
+    const izquierda = Math.min(margenHorizontal, window.innerWidth / 2);
+    const derecha = Math.max(window.innerWidth - margenHorizontal, window.innerWidth / 2);
+    const arriba = aviso.offsetHeight + 8;
+
+    aviso.classList.add('anclado');
+    aviso.style.left = THREE.MathUtils.clamp(x, izquierda, derecha) + 'px';
+    aviso.style.top = THREE.MathUtils.clamp(y - 12, arriba, window.innerHeight - 8) + 'px';
 }
 
 function configurarAvisoAnimal() {
@@ -1215,13 +1251,14 @@ function configurarMenuDestinos() {
     const lista = document.getElementById('listaDestinos');
     const estado = document.getElementById('estadoDestinos');
 
-    function seleccionarDestino(id) {
+    function seleccionarDestino(id, narrarLeyenda) {
         if (!puedeControlar()) return;
 
         const animal = ANIMALES.find(function(item) { return item.id === id; });
         if (!animal) return;
 
         if (enfocarDestino(animal)) {
+            if (narrarLeyenda) iniciarNarracionLeyenda(animal);
             lista.hidden = true;
             boton.setAttribute('aria-expanded', 'false');
             estado.textContent = '';
@@ -1246,7 +1283,7 @@ function configurarMenuDestinos() {
 
     marcadoresDestinos.forEach(function(marcador) {
         marcador.elemento.addEventListener('click', function() {
-            seleccionarDestino(marcador.elemento.dataset.marcador);
+            seleccionarDestino(marcador.elemento.dataset.marcador, true);
         });
     });
 
@@ -1291,7 +1328,7 @@ function actualizarMarcadoresDestinos() {
             continue;
         }
 
-        const posicion = animal.posicionMarcador || {
+        const posicion = animal.posicionMarcadorMundo || animal.posicionMarcador || {
             x: animal.posicion.x,
             y: 1.5,
             z: animal.posicion.z
@@ -1483,6 +1520,7 @@ function mostrarInfoAnimal(animal) {
         img.alt = animal.nombre;
         img.className = 'foto';
         img.loading = 'lazy';
+        img.style.cssText = 'max-height:240px;object-fit:cover;';
         cont.appendChild(img);
 
         const credito = agregar('p', 'Foto: ' + (animal.fotoAutor || 'autor no indicado') + ' · ', 'foto-credito');
@@ -1539,6 +1577,7 @@ async function abrirVisor(animal) {
     document.getElementById('visorTitulo').textContent = animal.nombre;
     mostrarInfoAnimal(animal);
     registrarDescubrimiento(animal.id);
+    iniciarNarracionLeyenda(animal);
 
     const estado = document.getElementById('visorEstado');
     const yaEnCache = !!cacheModelos[animal.id];
@@ -3409,6 +3448,11 @@ function alternarAudio(clave) {
     if (texto) hablar(texto, clave);
 }
 
+function iniciarNarracionLeyenda(animal) {
+    if (!animal.leyenda || (audioHablando && audioClave === animal.id)) return;
+    hablar(animal.nombre + '. ' + animal.leyenda, animal.id);
+}
+
 function botonAudio(clave) {
     const b = crear('button', { type: 'button', class: 'btn-chico sec', dataset: { audio: clave } });
     b.textContent = etiquetaAudio(clave);
@@ -3723,9 +3767,22 @@ function verEnVisor(id) {
     irADestino(id);
 }
 
+function agregarFotoAnimal(contenedor, animal) {
+    if (!animal.foto) return;
+
+    const img = crear('img', { class: 'foto', src: animal.foto, alt: animal.nombre, loading: 'lazy' });
+    img.style.cssText = 'width:100%;max-height:240px;object-fit:cover;border-radius:10px;';
+    const credito = crear('p', { class: 'nota' }, 'Foto: ' + (animal.fotoAutor || 'autor no indicado') + ' · ');
+    if (animal.fotoLink) credito.appendChild(enlace('ver original', animal.fotoLink, ''));
+    img.onerror = function() { img.remove(); credito.remove(); };
+    contenedor.appendChild(img);
+    contenedor.appendChild(credito);
+}
+
 function renderHistoria(c) {
     const casco = animalPorId('casco');
     c.appendChild(crear('h3', { texto: 'Historia del Casco del Minero' }));
+    agregarFotoAnimal(c, casco);
     c.appendChild(crear('p', { texto: casco.leyenda }));
     c.appendChild(crear('h3', { texto: casco.tituloExplicacion || 'Significado' }));
     c.appendChild(crear('p', { texto: casco.explicacion }));
@@ -3741,17 +3798,7 @@ function renderHistoria(c) {
 function renderMonumentos(c) {
     const casco = animalPorId('casco');
     c.appendChild(crear('h3', { texto: EMOJI_LUGAR.casco + ' ' + casco.nombre }));
-
-    if (casco.foto) {
-        const img = crear('img', { class: 'foto', src: casco.foto, alt: casco.nombre, loading: 'lazy' });
-        img.style.cssText = 'width:100%;max-height:240px;object-fit:cover;border-radius:10px;';
-        const credito = crear('p', { class: 'nota' }, 'Foto: ' + (casco.fotoAutor || 'autor no indicado') + ' · ');
-        if (casco.fotoLink) credito.appendChild(enlace('ver original', casco.fotoLink, ''));
-        img.onerror = function() { img.remove(); credito.remove(); };
-        c.appendChild(img);
-        c.appendChild(credito);
-    }
-
+    agregarFotoAnimal(c, casco);
     c.appendChild(crear('p', { texto: resumir(casco.leyenda, 360) }));
     c.appendChild(crear('div', { class: 'fila-botones' },
         boton('🧊 Ver modelo 3D', 'btn-chico', function() { verEnVisor('casco'); }),
