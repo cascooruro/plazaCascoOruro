@@ -97,17 +97,20 @@
 
 <!-- ======================= PORTADA ======================= -->
 <section id="portada">
+    <div class="intro-polvo" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
     <div class="contenido">
-        <h3>Patrimonio Histórico</h3>
-        <h1>MONUMENTO AL CASCO DEL MINERO</h1>
+        <p class="intro-etiqueta">MUSEO TURÍSTICO VIRTUAL · ORURO, BOLIVIA</p>
+        <h1>ORURO,<br>TIERRA DE HISTORIA Y LEYENDA</h1>
         <p>
-            Símbolo de la identidad minera de Oruro.
-            Explora este espacio y conoce parte de nuestra
-            historia y cultura.
+            Explora el monumento al Casco del Minero y descubre la historia,
+            la cultura y las leyendas de nuestra ciudad.
         </p>
         <div class="botones-portada">
-            <button onclick="iniciarExploracion(true)">🎵 Entrar con música</button>
-            <button class="btn-sec" onclick="iniciarExploracion(false)">🔇 Entrar sin música</button>
+            <button onclick="iniciarExploracion(true)">COMENZAR EXPERIENCIA <span aria-hidden="true">→</span></button>
+            <button class="btn-sec" onclick="iniciarExploracion(false)">Continuar sin música</button>
         </div>
     </div>
 </section>
@@ -123,7 +126,7 @@
         <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> día · tarde · noche · auto</li>
         <li><kbd>5</kbd>–<kbd>9</kbd> vistas de cámara · <kbd>0</kbd> volver al personaje</li>
         <li><kbd>M</kbd> mapa · <kbd>G</kbd> visita guiada · <kbd>F</kbd> modo foto</li>
-        <li><kbd>P</kbd> mostrar / ocultar coordenadas · <kbd>ESC</kbd> cerrar / pausa</li>
+        <li><kbd>ESC</kbd> cerrar / pausa</li>
     </ul>
 </div>
 
@@ -133,8 +136,6 @@
     <button type="button" class="movil-abajo" data-tecla="KeyS" aria-label="Retroceder">▼</button>
     <button type="button" class="movil-derecha" data-tecla="KeyD" aria-label="Mover a la derecha">▶</button>
 </div>
-
-<div id="coords"></div>
 
 <!-- ======================= LATERAL IZQUIERDO: EXPLORAR ======================= -->
 <aside id="panelExplorar" class="solo-explorando" aria-label="Explorar">
@@ -197,6 +198,105 @@
 
 <div id="ytPlayer"></div>
 <button id="btnMusica" tabindex="-1">🔇 Música apagada</button>
+
+<!-- ======================= GUÍA TURÍSTICA: EL MINERO ======================= -->
+<aside id="guiaMinero" class="solo-explorando" aria-label="Guía turístico El Minero">
+    <div class="guia-ilustracion" aria-hidden="true">
+        <svg class="guia-minero-svg" viewBox="0 0 140 180" role="presentation">
+            <defs>
+                <linearGradient id="mineroCascoGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop stop-color="#ffe38b"/>
+                    <stop offset=".42" stop-color="#d89a2c"/>
+                    <stop offset="1" stop-color="#855019"/>
+                </linearGradient>
+                <linearGradient id="mineroChaquetaGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop stop-color="#152a32"/>
+                    <stop offset=".48" stop-color="#52605a"/>
+                    <stop offset="1" stop-color="#17252a"/>
+                </linearGradient>
+                <linearGradient id="mineroPielGrad" x1="0" y1="0" x2=".8" y2="1">
+                    <stop stop-color="#f0c49b"/>
+                    <stop offset=".58" stop-color="#bd805b"/>
+                    <stop offset="1" stop-color="#754432"/>
+                </linearGradient>
+                <linearGradient id="mineroPantalonGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop stop-color="#252b2a"/>
+                    <stop offset=".5" stop-color="#55554b"/>
+                    <stop offset="1" stop-color="#202729"/>
+                </linearGradient>
+                <radialGradient id="mineroLamparaGrad">
+                    <stop stop-color="#fffde0"/>
+                    <stop offset=".4" stop-color="#ffe38b"/>
+                    <stop offset="1" stop-color="#d58d28"/>
+                </radialGradient>
+                <filter id="mineroSombra" x="-30%" y="-20%" width="160%" height="150%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="2.2"/>
+                    <feOffset dy="2"/>
+                    <feComponentTransfer><feFuncA type="linear" slope=".45"/></feComponentTransfer>
+                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+            </defs>
+            <ellipse cx="70" cy="170" rx="39" ry="6" fill="#02070b" opacity=".5"/>
+            <g filter="url(#mineroSombra)">
+                <path d="M53 128 49 151 43 165 61 166 68 145 73 128Z" fill="url(#mineroPantalonGrad)" stroke="#121a1c" stroke-width="2"/>
+                <path d="M73 128 75 148 83 164 101 162 91 144 91 127Z" fill="url(#mineroPantalonGrad)" stroke="#121a1c" stroke-width="2"/>
+                <path d="M43 161 Q51 158 62 163 L64 169 Q53 173 39 171Z" fill="#302b25" stroke="#171819" stroke-width="2"/>
+                <path d="M82 160 Q92 157 102 160 L109 168 Q97 173 84 169Z" fill="#302b25" stroke="#171819" stroke-width="2"/>
+                <path d="m55 137-3 15m30-13 6 13" fill="none" stroke="#858174" stroke-width="1.5" opacity=".65"/>
+                <path d="M45 77 Q70 68 95 78 L101 132 Q71 142 39 132Z" fill="url(#mineroChaquetaGrad)" stroke="#152025" stroke-width="2"/>
+                <path d="m58 77 12 16 13-16 7 55H51Z" fill="#b87b35" stroke="#633f20" stroke-width="1.5"/>
+                <path d="m62 81 8 12 9-12 5 49H59Z" fill="#c99a4e"/>
+                <path d="M65 94h8m-9 12h10m-11 12h12" stroke="#f4d18a" stroke-width="2" opacity=".8"/>
+                <path d="M49 85 Q38 85 32 105 L26 124 36 129 51 108Z" fill="#344840" stroke="#19282a" stroke-width="2"/>
+                <path d="M30 120 Q25 123 26 130 Q30 135 37 130 L40 124Z" fill="url(#mineroPielGrad)"/>
+                <path class="minero-brazo-gesto" d="M91 84 Q102 82 106 67 L113 69 Q114 91 101 108 L91 113Z" fill="url(#mineroChaquetaGrad)" stroke="#19282a" stroke-width="2"/>
+                <path d="M105 68 Q105 62 111 61 Q117 63 116 70 L112 77Z" fill="url(#mineroPielGrad)" stroke="#80523c" stroke-width="1"/>
+                <path d="M43 77 57 72 70 89 83 72 97 78 91 91 82 86 82 134 56 134 56 86 48 92Z" fill="none" stroke="#d0a347" stroke-width="2"/>
+                <path d="M54 132h33" stroke="#f1c766" stroke-width="4"/>
+                <path d="M61 132v9m18-9v9" stroke="#222a28" stroke-width="3"/>
+                <path d="M58 50 Q58 43 70 43 Q82 43 82 51 L81 70 Q78 80 70 81 Q61 79 59 70Z" fill="url(#mineroPielGrad)" stroke="#704835" stroke-width="1.5"/>
+                <path d="M58 57 Q52 54 53 62 Q54 67 60 66m22-9q7-3 7 5-1 6-7 5" fill="url(#mineroPielGrad)" stroke="#80523c" stroke-width="1.5"/>
+                <path d="M61 61q4-3 8 0m7 0q4-3 7 0" fill="none" stroke="#49352c" stroke-width="2" stroke-linecap="round"/>
+                <g class="minero-ojos" fill="#241b17">
+                    <ellipse cx="66" cy="64" rx="1.7" ry="2.1"/>
+                    <ellipse cx="80" cy="64" rx="1.7" ry="2.1"/>
+                </g>
+                <path d="m73 64-2 8 4 1" fill="none" stroke="#8a5940" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M63 74 Q71 79 82 74 Q80 84 72 84 Q65 82 63 74Z" fill="#57362e"/>
+                <path class="minero-boca" d="M68 78 Q73 81 78 78" fill="none" stroke="#f0c49b" stroke-width="1.7" stroke-linecap="round"/>
+                <path d="M59 49 Q61 37 71 37 Q82 38 84 50 L80 55 62 54Z" fill="#342b22"/>
+                <path d="M52 48 Q53 28 71 26 Q90 28 91 48 L84 53 60 52Z" fill="url(#mineroCascoGrad)" stroke="#724817" stroke-width="2"/>
+                <path d="M44 49 Q70 43 98 49 L96 55 Q71 60 47 55Z" fill="#9d671d" stroke="#f1c35b" stroke-width="2"/>
+                <path d="M48 49 Q70 45 92 49" fill="none" stroke="#fff0b0" stroke-width="1.5" opacity=".9"/>
+                <rect x="66" y="39" width="11" height="10" rx="3" fill="#ece8d6" stroke="#86551b" stroke-width="1.5"/>
+                <circle class="minero-luz" cx="71.5" cy="44" r="3.5" fill="url(#mineroLamparaGrad)"/>
+                <path d="M69 30 Q72 27 76 29" fill="none" stroke="#fff1b1" stroke-width="1.5" opacity=".8"/>
+            </g>
+            <path d="M29 112 18 145" stroke="#80603b" stroke-width="4" stroke-linecap="round"/>
+            <path d="M13 111 Q25 103 36 108 L33 114 Q24 117 17 119Z" fill="#aeb6b4" stroke="#536064" stroke-width="2"/>
+            <path d="M15 111 33 108" stroke="#e2e4dc" stroke-width="1.5"/>
+        </svg>
+    </div>
+    <div class="guia-panel">
+        <div class="guia-cabecera">
+            <div>
+                <strong>EL MINERO</strong>
+                <small>Tu guía por Oruro</small>
+            </div>
+            <button id="guiaNarrador" type="button" aria-pressed="true" aria-label="Desactivar voz del guía">🔊</button>
+        </div>
+        <p id="guiaSubtitulos" role="status" aria-live="polite" aria-atomic="true">
+            ¡Hola! Soy tu guía. Empecemos a explorar.
+        </p>
+        <div class="guia-controles" aria-label="Controles del narrador">
+            <button id="guiaRepetir" type="button" aria-label="Repetir narración">↻</button>
+            <button id="guiaPausa" type="button" aria-label="Pausar narración" disabled>Ⅱ</button>
+            <button id="guiaDetener" type="button" aria-label="Detener narración" disabled>■</button>
+            <label for="guiaVolumen">Volumen</label>
+            <input id="guiaVolumen" type="range" min="0" max="1" step="0.05" value="0.9" aria-label="Volumen del guía">
+        </div>
+    </div>
+</aside>
 
 <!-- ======================= INDICADOR DE INTERACCIÓN (solo cerca de un objeto) ======================= -->
 <div id="avisoAnimal">

@@ -31,8 +31,8 @@ const CFG = {
     fuerzaSalto: 3.2,
     alturaEscalon: 0.06,
     distanciaActivacion: 1.2, // distancia por defecto a la que aparece la letra
-    pixelRatioMax: 1.25,      // mayor nitidez en equipos capaces; se reduce automáticamente si hace falta
-    pixelRatioMin: 0.65,      // resolución mínima a la que puede bajar
+    pixelRatioMax: 1.0,       // prioriza fluidez sobre resolución extra
+    pixelRatioMin: 0.6,       // resolución mínima a la que puede bajar
     meteoros: 25,             // cantidad de meteoritos (bájalo si va lento)
     anisotropia: 4,           // calidad de texturas lejanas
     texturaMax: 1024,         // reduce el uso de memoria de GPU en equipos modestos
@@ -157,6 +157,7 @@ let fondoCanvas, fondoCtx, fondoTextura;
 const CARPETA_LOCAL = 'animales/';
 
 const REPOS = [
+    'https://raw.githubusercontent.com/cascooruro/AnimalesCascoOruro/main/',
     'https://raw.githubusercontent.com/huarayogabriel8-netizen/AnimalesCascoOruro/master/',
     'https://raw.githubusercontent.com/huarayogabriel8-netizen/AnimalesCascoOruro/main/'
 ];
@@ -270,7 +271,7 @@ const ANIMALES = [
         foto: 'https://commons.wikimedia.org/wiki/Special:FilePath/Casco_del_Minero,_Oruro.jpg?width=800',
         fotoAutor: 'Parallelepiped09 (CC BY-SA 4.0, Wikimedia Commons, 2025)',
         fotoLink: 'https://es.wikipedia.org/wiki/Archivo:Casco_del_Minero,_Oruro.jpg',
-        leyenda: 'El Casco del Minero es una escultura monumental de hojalata y metal, de unos 6 metros, en la zona Norte de Oruro, dentro de la plaza circular por donde se entra a la ciudad desde la doble vía. Es obra del artista Fernando Crespo y forma parte de las esculturas de chatarra que la alcaldía impulsó en la gestión de Edgar Bazán, junto a Finelez Llanque y Tito Yugar, para dar la bienvenida a los visitantes con las danzas del Carnaval. En su superficie aparecen la actividad minera, los palliris, los mineros, los ferrocarriles y las cuatro plagas de la leyenda. En el lugar de la linterna está la imagen de la Virgen del Socavón, patrona de los mineros. El diseño original tenía un dragón encima, pero por su peso se cayó. Ya existía en 2008 y en 2016 se mejoró el lugar con fuentes de agua, jardineras, iluminación LED y una sala de exposición del Carnaval bajo el casco.',
+        leyenda: 'El Casco del Minero es una escultura monumental de hojalata y metal, de unos 6 metros, en la zona Norte de Oruro, dentro de la plaza circular por donde se entra a la ciudad desde la doble vía. Es obra del artista Fernando Crespo y forma parte de las esculturas de chatarra que la alcaldía impulsó en la gestión de Edgar Bazán, junto a Finelez Llanque y Tito Yugar, para dar la bienvenida a los visitantes con las danzas del Carnaval. En su superficie aparecen la actividad minera, los palliris, los mineros, los ferrocarriles y las cuatro plagas de la leyenda. En el lugar de la linterna está la imagen de la Virgen del Socavón, centro de la devoción del Carnaval: el obispo de Oruro explicó que los mineros comenzaron a bailar en su honor. El diseño original tenía un dragón encima, pero por su peso se cayó. Ya existía en 2008 y en 2016 se mejoró el lugar con fuentes de agua, jardineras, iluminación LED y una sala de exposición del Carnaval bajo el casco.',
         explicacion: 'El casco une dos ideas de Oruro: la minería, que sostiene su identidad, y la mitología del Carnaval. En las jardineras de la plaza están la víbora, las hormigas, el sapo y el lagarto, por eso los cuatro animales que visitaste forman un solo conjunto con el casco.',
         fuentes: [FUENTE_CASCO_2011, FUENTE_CASCO_2015, FUENTE_CASCO_2016, FUENTE_CASCO_2017, FUENTE_CASCO_TIWY]
     }
@@ -368,6 +369,7 @@ let recursosListos = 0;
 let falloCarga = false;
 let contadorFrames = 0;
 let historiaMostrada = false; // la historia del casco se abre sola una vez al entrar
+let temporizadorHistoriaInicial = null;
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
@@ -469,6 +471,12 @@ let vistaFija = null;
 const miraActual = new THREE.Vector3();
 const _vPos = new THREE.Vector3();
 const _vMira = new THREE.Vector3();
+const DURACION_SUBIDA_CAMARA = 1.8;
+const DURACION_VUELTA_CAMARA = 6;
+const DURACION_LLEGADA_CAMARA = 2.2;
+const DURACION_RECORRIDO_CAMARA =
+    DURACION_SUBIDA_CAMARA + DURACION_VUELTA_CAMARA + DURACION_LLEGADA_CAMARA;
+let recorridoCamaraInicial = null;
 
 // Meteoritos
 let arrayMeteoros = [];
@@ -476,12 +484,10 @@ let arrayMeteoros = [];
 // Zonas de animales / casco
 let zonas = [];
 let zonaActual = null;
-let mostrarCoords = false;
-let textoCoordsAnterior = '';
 let destinoInfoPendiente = null;
 
 // Calidad adaptativa
-let pixelRatioActual = Math.min(Math.max(window.devicePixelRatio || 1, 1.25), CFG.pixelRatioMax);
+let pixelRatioActual = Math.min(window.devicePixelRatio || 1, CFG.pixelRatioMax);
 let acumTiempo = 0;
 let acumFrames = 0;
 let tiempoMarcadores = 0;
@@ -563,14 +569,14 @@ function vigilarRendimiento(dtReal) {
     if (dtReal > 0.5) return;
     acumTiempo += dtReal;
     acumFrames++;
-    if (acumFrames < 90) return;
+    if (acumFrames < 45) return;
 
     const promedio = acumTiempo / acumFrames;
     acumTiempo = 0;
     acumFrames = 0;
 
-    if (promedio > 0.034 && pixelRatioActual > CFG.pixelRatioMin) {
-        pixelRatioActual = Math.max(CFG.pixelRatioMin, pixelRatioActual - 0.25);
+    if (promedio > 0.028 && pixelRatioActual > CFG.pixelRatioMin) {
+        pixelRatioActual = Math.max(CFG.pixelRatioMin, pixelRatioActual - 0.2);
         aplicarPixelRatio();
         console.log('Rendimiento bajo: resolución ajustada a', pixelRatioActual);
     }
@@ -921,7 +927,7 @@ function iniciarEscena() {
     luzSol = new THREE.DirectionalLight(0xffffff, 1);
     luzSol.position.set(15, 25, 20);
     luzSol.castShadow = true;
-    luzSol.shadow.mapSize.set(1024, 1024);
+    luzSol.shadow.mapSize.set(512, 512);
     luzSol.shadow.bias = -0.001;
     luzSol.shadow.camera.left = -60;
     luzSol.shadow.camera.right = 60;
@@ -1160,7 +1166,7 @@ function construirZonasAnimales() {
 
         if (!caja) {
             console.warn('No se encontró "' + animal.nombre + '" en el mapa. ' +
-                'Camina hasta él, presiona P para ver tus coordenadas y ponlas en posicion: { x, z }.');
+                'Ajusta su posicion: { x, z } para ubicarlo en el mapa.');
             return;
         }
 
@@ -1194,14 +1200,17 @@ function actualizarZonaAnimal() {
 
     if (mejor !== zonaActual) {
         zonaActual = mejor;
-        if (zonaActual) registrarDescubrimiento(zonaActual.animal.id);
+        if (zonaActual) {
+            registrarDescubrimiento(zonaActual.animal.id);
+            iniciarNarracionLeyenda(zonaActual.animal);
+        }
     }
 
     const aviso = document.getElementById('avisoAnimal');
     if (zonaActual) {
         document.getElementById('avisoLetra').textContent = zonaActual.animal.letra;
         document.getElementById('avisoNombre').textContent = zonaActual.animal.nombre;
-        document.getElementById('avisoAccion').textContent = 'Presiona la tecla o haz clic';
+        document.getElementById('avisoAccion').textContent = 'Presiona ' + zonaActual.animal.letra + ' o haz clic';
         aviso.style.display = 'flex';
         posicionarAvisoAnimal(aviso, zonaActual.animal);
     } else {
@@ -1542,6 +1551,13 @@ function mostrarInfoAnimal(animal) {
     agregar('h3', animal.tituloExplicacion || 'Explicación');
     agregar('p', animal.explicacion || '');
 
+    if (animal.id === 'casco') {
+        agregar('h3', 'La Virgen del Socavón');
+        agregarFotoAnimal(cont, HISTORIA_VIRGEN);
+        agregar('p', HISTORIA_VIRGEN.historia);
+        cont.appendChild(crearFuentes(HISTORIA_VIRGEN.fuentes, 'Fuentes sobre la Virgen'));
+    }
+
     agregarSeccionesTurismo(cont, animal);
 
     if (animal.fuentes && animal.fuentes.length) {
@@ -1841,13 +1857,14 @@ function cargarPersonaje() {
 
         fbxLoader.load('quieto.fbx', function(fbx) {
 
+            let clipReposo = null;
             try {
                 const clipOriginal = fbx.animations[0];
 
                 if (!clipOriginal) {
                     console.error('El archivo quieto.fbx no contiene animaciones.');
                 } else {
-                    const clipReposo = crearClipReposo(clipOriginal, fbx);
+                    clipReposo = crearClipReposo(clipOriginal, fbx);
                     if (clipReposo) acciones.reposo = mixer.clipAction(clipReposo);
                 }
             } catch (e) {
@@ -2385,7 +2402,7 @@ function actualizarJugador(dt) {
         const objetivo = Math.atan2(vx, vz);
         let dif = objetivo - jugador.rotation.y;
         dif = Math.atan2(Math.sin(dif), Math.cos(dif));
-        jugador.rotation.y += dif * Math.min(1, dt * 12);
+        jugador.rotation.y += dif * (1 - Math.exp(-12 * dt));
     }
 
     // ---------- ANIMACIÓN ----------
@@ -2463,8 +2480,138 @@ const _objetivo = new THREE.Vector3();
 const _deseada = new THREE.Vector3();
 const _dirCam = new THREE.Vector3();
 
+function iniciarRecorridoCamaraInicial() {
+    const tamano = limitesMapa.getSize(new THREE.Vector3());
+    const dimensionMapa = Math.max(tamano.x, tamano.z);
+    if (!Number.isFinite(dimensionMapa) || dimensionMapa <= 0) {
+        console.error('No se pudo calcular el recorrido aéreo: los límites del mapa no son válidos.');
+        return false;
+    }
+
+    if (vistaFija) elegirVista('Digit0');
+    limpiarTeclas();
+    const casco = ANIMALES.find(function(animal) { return animal.id === 'casco'; });
+    if (!casco) {
+        console.error('No se pudo iniciar el recorrido: no se encontró el Casco del Minero.');
+        return false;
+    }
+    const centro = new THREE.Vector3(casco.posicion.x, 1.5, casco.posicion.z);
+
+    const direccionInicial = camara.getWorldDirection(new THREE.Vector3());
+    const objetivoInicial = camara.position.clone().addScaledVector(direccionInicial, 10);
+    const anguloInicial = Math.atan2(
+        camara.position.z - centro.z,
+        camara.position.x - centro.x
+    );
+    const radio = THREE.MathUtils.clamp(dimensionMapa * 0.12, 6, 12);
+    const radioFinal = radio * 0.65;
+    const altura = centro.y + THREE.MathUtils.clamp(dimensionMapa * 0.04, 3, 6);
+    const posicionInicioOrbita = new THREE.Vector3(
+        centro.x + Math.cos(anguloInicial) * radio,
+        altura,
+        centro.z + Math.sin(anguloInicial) * radio
+    );
+    const posicionFinOrbita = new THREE.Vector3(
+        centro.x + Math.cos(anguloInicial) * radioFinal,
+        altura,
+        centro.z + Math.sin(anguloInicial) * radioFinal
+    );
+    const objetivoPersonaje = new THREE.Vector3(
+        jugador.position.x,
+        jugador.position.y + CAMARAS[modoCamara].altura,
+        jugador.position.z
+    );
+    const direccionFinal = new THREE.Vector3(
+        -Math.sin(camaraYaw) * Math.cos(camaraPitch),
+        Math.sin(camaraPitch),
+        Math.cos(camaraYaw) * Math.cos(camaraPitch)
+    ).normalize();
+    const posicionFinal = objetivoPersonaje.clone()
+        .addScaledVector(direccionFinal, distPorModo[modoCamara]);
+
+    recorridoCamaraInicial = {
+        tiempo: 0,
+        centro: centro,
+        radio: radio,
+        altura: altura,
+        anguloInicial: anguloInicial,
+        posicionInicial: camara.position.clone(),
+        objetivoInicial: objetivoInicial,
+        posicionInicioOrbita: posicionInicioOrbita,
+        posicionFinOrbita: posicionFinOrbita,
+        objetivoPersonaje: objetivoPersonaje,
+        posicionFinal: posicionFinal,
+        radioFinal: radioFinal
+    };
+    document.body.classList.add('recorrido-inicial');
+    document.getElementById('panelCamara').style.display = 'none';
+    document.getElementById('panelVistas').style.display = 'none';
+    camara.fov = Math.max(camara.fov, 65);
+    camara.updateProjectionMatrix();
+    return true;
+}
+
+function actualizarRecorridoCamaraInicial(dt) {
+    const recorrido = recorridoCamaraInicial;
+    recorrido.tiempo = Math.min(DURACION_RECORRIDO_CAMARA, recorrido.tiempo + dt);
+    const tiempoSubida = DURACION_SUBIDA_CAMARA;
+    const tiempoOrbita = tiempoSubida + DURACION_VUELTA_CAMARA;
+
+    if (recorrido.tiempo < tiempoSubida) {
+        const t = recorrido.tiempo / tiempoSubida;
+        const suave = t * t * (3 - 2 * t);
+        camara.position.lerpVectors(recorrido.posicionInicial, recorrido.posicionInicioOrbita, suave);
+        _vMira.lerpVectors(recorrido.objetivoInicial, recorrido.centro, suave);
+    } else if (recorrido.tiempo < tiempoOrbita) {
+        const t = (recorrido.tiempo - tiempoSubida) / DURACION_VUELTA_CAMARA;
+        const angulo = recorrido.anguloInicial + Math.PI * 2 * t;
+        const radio = recorrido.radio + (recorrido.radioFinal - recorrido.radio) * (t * t * (3 - 2 * t));
+        camara.position.set(
+            recorrido.centro.x + Math.cos(angulo) * radio,
+            recorrido.altura,
+            recorrido.centro.z + Math.sin(angulo) * radio
+        );
+        _vMira.copy(recorrido.centro);
+    } else {
+        const t = (recorrido.tiempo - tiempoOrbita) / DURACION_LLEGADA_CAMARA;
+        const suave = t * t * (3 - 2 * t);
+        camara.position.lerpVectors(recorrido.posicionFinOrbita, recorrido.posicionFinal, suave);
+        _vMira.lerpVectors(recorrido.centro, recorrido.objetivoPersonaje, suave);
+    }
+
+    camara.lookAt(_vMira);
+    if (recorrido.tiempo < DURACION_RECORRIDO_CAMARA) return;
+
+    terminarRecorridoCamaraInicial(false);
+}
+
+function terminarRecorridoCamaraInicial(omitirHistoria) {
+    if (!recorridoCamaraInicial) return;
+    camara.position.copy(recorridoCamaraInicial.posicionFinal);
+    camara.lookAt(recorridoCamaraInicial.objetivoPersonaje);
+    recorridoCamaraInicial = null;
+    document.body.classList.remove('recorrido-inicial');
+    document.getElementById('panelCamara').style.display = 'flex';
+    document.getElementById('panelVistas').style.display = 'flex';
+    limpiarTeclas();
+    mostrarAyudaInicial();
+    mostrarToast('Recorrido aéreo completo · ya puedes explorar');
+    if (temporizadorHistoriaInicial !== null) {
+        clearTimeout(temporizadorHistoriaInicial);
+        temporizadorHistoriaInicial = null;
+        if (!omitirHistoria) {
+            temporizadorHistoriaInicial = setTimeout(mostrarHistoriaInicial, 1200);
+        }
+    }
+}
+
 function actualizarCamara(dt = 0.016, inmediata = false) {
     if (!jugador) return;
+
+    if (recorridoCamaraInicial) {
+        actualizarRecorridoCamaraInicial(dt);
+        if (recorridoCamaraInicial) return;
+    }
 
     // Vista fija: la cámara viaja suavemente al ángulo elegido
     if (vistaFija) {
@@ -2626,7 +2773,15 @@ function crearPanelCamara() {
 // ======================================
 
 function puedeControlar() {
-    return explorando && !pausado && !informacionAbierta && !visorAbierto && !panelUIAbierto;
+    return explorando && !pausado && !informacionAbierta && !visorAbierto &&
+        !panelUIAbierto && !recorridoCamaraInicial;
+}
+
+function mostrarHistoriaInicial() {
+    temporizadorHistoriaInicial = null;
+    if (explorando && !pausado && !panelUIAbierto && !visorAbierto && !informacionAbierta) {
+        abrirSeccion('historia');
+    }
 }
 
 function configurarMouse() {
@@ -2634,6 +2789,13 @@ function configurarMouse() {
 
     lienzo.addEventListener('pointerdown', function(e) {
         if (puedeControlar() && e.button === 0) {
+            const puntoMuseo = dentroMuseo ? puntoAzulMuseoBajoCursor(e) : null;
+            if (puntoMuseo) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                abrirContenidoPuntoMuseo(puntoMuseo);
+                return;
+            }
             if (vistaFija) elegirVista('Digit0');   // arrastrar vuelve al personaje
             arrastrando = true;
         }
@@ -2703,14 +2865,10 @@ window.iniciarExploracion = function(conMusica) {
     ponerMusica(conMusica === true);
 
     document.getElementById('portada').style.display = 'none';
-    mostrarAyudaInicial();   // ayuda breve que se oculta sola (botón ⌨️ para verla de nuevo)
     document.getElementById('panelAmbiente').style.display = 'flex';
     document.getElementById('panelVistas').style.display = 'flex';
     document.getElementById('listaVistas').setAttribute('aria-hidden', 'false');
     document.getElementById('panelCamara').style.display = 'flex';
-    mostrarCoords = true;
-    textoCoordsAnterior = '';
-    document.getElementById('coords').style.display = 'block';
     document.getElementById('btnMusica').style.display = 'block';
     document.getElementById('menuDestinos').classList.add('visible');
     document.getElementById('marcadoresDestinos').classList.add('visible');
@@ -2719,18 +2877,18 @@ window.iniciarExploracion = function(conMusica) {
     }
 
     alIniciarExploracion();
+    actualizarCamara(0, true);
+    const recorridoIniciado = iniciarRecorridoCamaraInicial();
+    if (!recorridoIniciado) mostrarAyudaInicial();
 
     // Al entrar, se abre sola la historia del Casco del Minero (una vez por visita)
     if (!historiaMostrada) {
         historiaMostrada = true;
-        setTimeout(function() {
-            if (explorando && !pausado && !panelUIAbierto && !visorAbierto && !informacionAbierta) {
-                abrirSeccion('historia');
-            }
-        }, 1200);
+        temporizadorHistoriaInicial = setTimeout(
+            mostrarHistoriaInicial,
+            (recorridoIniciado ? DURACION_RECORRIDO_CAMARA * 1000 : 0) + 1200
+        );
     }
-
-    actualizarCamara(0, true);
 };
 
 
@@ -2744,6 +2902,12 @@ const TECLAS_JUEGO = [
 ];
 
 function teclaPresionada(e) {
+    if (recorridoCamaraInicial) {
+        e.preventDefault();
+        terminarRecorridoCamaraInicial(true);
+        return;
+    }
+
     // Escribir en el buscador no debe mover al personaje ni activar atajos
     const enCampoTexto = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if (enCampoTexto && e.code !== 'Escape') return;
@@ -2804,15 +2968,6 @@ function teclaPresionada(e) {
         if (e.code === 'KeyG') { if (tourActivo) terminarTour(true); else iniciarTour(); return; }
     }
 
-    // P: muestra u oculta tus coordenadas
-    if (e.code === 'KeyP' && !e.repeat && explorando) {
-        mostrarCoords = !mostrarCoords;
-        document.getElementById('coords').style.display = mostrarCoords ? 'block' : 'none';
-        if (mostrarCoords && jugador) {
-            console.log('Posición del jugador: x =', +jugador.position.x.toFixed(2),
-                'z =', +jugador.position.z.toFixed(2));
-        }
-    }
 }
 
 function teclaSoltada(e) { teclas[e.code] = false; }
@@ -2902,7 +3057,7 @@ function animar() {
     actualizarAmbiente(delta);
 
     if (explorando) {
-        if (!informacionAbierta && !panelUIAbierto) actualizarJugador(delta);
+        if (!recorridoCamaraInicial && !informacionAbierta && !panelUIAbierto) actualizarJugador(delta);
         actualizarPersonajesSecundarios(delta);
         actualizarCamara(delta);
         tiempoMarcadores += delta;
@@ -2914,19 +3069,10 @@ function animar() {
     }
 
     actualizarZonaAnimal();
+    actualizarMuseo();
     actualizarLugarActual(delta);
 
     if (mixer && !informacionAbierta) mixer.update(delta);
-
-    if (mostrarCoords && jugador) {
-        const txt = 'Posición 3D · X: ' + jugador.position.x.toFixed(2) +
-            '   Y: ' + jugador.position.y.toFixed(2) +
-            '   Z: ' + jugador.position.z.toFixed(2);
-        if (txt !== textoCoordsAnterior) {
-            textoCoordsAnterior = txt;
-            document.getElementById('coords').textContent = txt;
-        }
-    }
 
     actualizarMeteoros(delta);
 
@@ -3002,6 +3148,20 @@ const FUENTE_UNESCO_2008 = {
     titulo: 'Carnaval de Oruro (Lista Representativa del Patrimonio Cultural Inmaterial de la Humanidad)',
     url: 'https://ich.unesco.org/es/RL/el-carnaval-de-oruro-00003',
     oficial: true
+};
+const FUENTE_ABI_VIRGEN = {
+    autor: 'Agencia Boliviana de Información (ABI) · declaraciones del obispo de Oruro',
+    titulo: 'Primera velada da inicio a las actividades del Carnaval de Oruro 2022 (04/11/2021)',
+    url: 'https://historico.abi.bo/index.php/noticias/culturas/14736-primera-velada-da-inicio-a-las-actividades-del-carnaval-de-oruro-2022',
+    oficial: true
+};
+const HISTORIA_VIRGEN = {
+    nombre: 'Virgen del Socavón',
+    foto: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/Monumento_a_la_Virgen_Candelaria.JPG/960px-Monumento_a_la_Virgen_Candelaria.JPG',
+    fotoAutor: 'Gonzalo Flores (CC BY-SA 3.0, Wikimedia Commons, 2013)',
+    fotoLink: 'https://commons.wikimedia.org/wiki/File:Monumento_a_la_Virgen_Candelaria.JPG',
+    historia: 'La Virgen del Socavón es el centro de la devoción del Carnaval de Oruro. En declaraciones recogidas por ABI, el obispo de la Diócesis de Oruro, Cristóbal Bialasik, explicó que los mineros comenzaron a bailar en su honor y que la peregrinación llega hasta los pies de la Virgen. UNESCO documenta el trasfondo histórico: la antigua fiesta uru de Ito continuó bajo formas cristianas, se transformó en la celebración de la Candelaria (2 de febrero) y la Diablada pasó a ser la danza principal de Oruro.',
+    fuentes: [FUENTE_ABI_VIRGEN, FUENTE_UNESCO_2008]
 };
 
 // Altitud: dato de la CIUDAD (no del monumento). Las fuentes consultadas no coinciden entre sí.
@@ -3291,7 +3451,7 @@ function registrarDescubrimiento(id) {
 
 let tiempoLugar = 0;
 let lugarMostrado = '';
-let lugarForzado = null;   // la visita guiada fija el nombre del lugar
+let lugarForzado = null;   // la visita guiada (o el museo) fija el nombre del lugar
 
 function actualizarLugarActual(dt) {
     tiempoLugar += dt;
@@ -3331,6 +3491,77 @@ function actualizarLugarActual(dt) {
 let audioToken = 0;
 let audioHablando = false;
 let audioClave = null;
+let guiaNarradorActivo = true;
+let guiaTextoActual = '';
+let guiaClaveActual = 'bienvenida';
+let guiaUtteranceActual = null;
+let guiaVolumen = 0.9;
+let guiaPausado = false;
+
+function mostrarSubtituloGuia(texto) {
+    const subtitulos = porId('guiaSubtitulos');
+    if (subtitulos) subtitulos.textContent = texto;
+}
+
+function actualizarControlesGuia() {
+    const narrador = porId('guiaNarrador');
+    const repetir = porId('guiaRepetir');
+    const pausa = porId('guiaPausa');
+    const detener = porId('guiaDetener');
+    if (narrador) {
+        narrador.textContent = guiaNarradorActivo ? '🔊' : '🔇';
+        narrador.setAttribute('aria-pressed', String(guiaNarradorActivo));
+        narrador.setAttribute('aria-label', guiaNarradorActivo ? 'Desactivar voz del guía' : 'Activar voz del guía');
+    }
+    if (repetir) repetir.disabled = !guiaTextoActual;
+    if (pausa) {
+        pausa.disabled = !audioHablando;
+        pausa.textContent = guiaPausado ? '▶' : 'Ⅱ';
+        pausa.setAttribute('aria-label', guiaPausado ? 'Continuar narración' : 'Pausar narración');
+    }
+    if (detener) detener.disabled = !audioHablando;
+}
+
+function configurarControlesGuia() {
+    porId('guiaNarrador').addEventListener('click', function(e) {
+        guiaNarradorActivo = !guiaNarradorActivo;
+        if (guiaNarradorActivo) {
+            if (guiaTextoActual) hablar(guiaTextoActual, guiaClaveActual);
+        } else {
+            detenerAudio();
+        }
+        actualizarControlesGuia();
+        e.currentTarget.blur();
+    });
+
+    porId('guiaRepetir').addEventListener('click', function(e) {
+        if (guiaTextoActual) hablar(guiaTextoActual, guiaClaveActual);
+        e.currentTarget.blur();
+    });
+    porId('guiaPausa').addEventListener('click', function(e) {
+        if (!audioHablando || !('speechSynthesis' in window)) return;
+        if (guiaPausado) {
+            window.speechSynthesis.resume();
+            guiaPausado = false;
+            document.body.classList.remove('guia-pausado');
+        } else {
+            window.speechSynthesis.pause();
+            guiaPausado = true;
+            document.body.classList.add('guia-pausado');
+        }
+        actualizarControlesGuia();
+        e.currentTarget.blur();
+    });
+    porId('guiaDetener').addEventListener('click', function(e) {
+        detenerAudio();
+        e.currentTarget.blur();
+    });
+    porId('guiaVolumen').addEventListener('input', function(e) {
+        guiaVolumen = Number(e.currentTarget.value);
+        if (guiaUtteranceActual) guiaUtteranceActual.volume = guiaVolumen;
+    });
+    actualizarControlesGuia();
+}
 
 function textoGuia(clave) {
     if (clave === 'cultura') return TEXTO_CULTURA.join(' ');
@@ -3372,8 +3603,18 @@ function bajarMusica(bajar) {
 }
 
 function hablar(texto, clave, alTerminar) {
+    guiaTextoActual = texto;
+    guiaClaveActual = clave || 'bienvenida';
+    const trozos = dividirEnFrases(texto);
+    mostrarSubtituloGuia(trozos[0] || texto);
+
+    if (!guiaNarradorActivo) {
+        actualizarControlesGuia();
+        return false;
+    }
     if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
         mostrarToast('Tu navegador no admite la guía con audio.', 'aviso');
+        actualizarControlesGuia();
         return false;
     }
 
@@ -3381,9 +3622,9 @@ function hablar(texto, clave, alTerminar) {
     const token = ++audioToken;
     audioClave = clave;
     audioHablando = true;
+    document.body.classList.add('guia-hablando');
     bajarMusica(true);
 
-    const trozos = dividirEnFrases(texto);
     const voz = elegirVoz();
     let i = 0;
 
@@ -3391,6 +3632,9 @@ function hablar(texto, clave, alTerminar) {
         if (token !== audioToken) return;
         audioHablando = false;
         audioClave = null;
+        guiaUtteranceActual = null;
+        guiaPausado = false;
+        document.body.classList.remove('guia-hablando', 'guia-pausado');
         bajarMusica(false);
         actualizarBotonesAudio();
         if (completo && alTerminar) alTerminar();
@@ -3399,14 +3643,21 @@ function hablar(texto, clave, alTerminar) {
     function siguiente() {
         if (token !== audioToken) return;
         if (i >= trozos.length) { finalizar(true); return; }
-        const u = new SpeechSynthesisUtterance(trozos[i++]);
+        const frase = trozos[i++];
+        mostrarSubtituloGuia(frase);
+        const u = new SpeechSynthesisUtterance(frase);
         u.lang = voz ? voz.lang : 'es-ES';
         if (voz) u.voice = voz;
         u.rate = 0.95;
+        u.volume = guiaVolumen;
+        guiaUtteranceActual = u;
         u.onend = siguiente;
         u.onerror = function(ev) {
             if (token !== audioToken) return;
-            if (ev && (ev.error === 'interrupted' || ev.error === 'canceled')) return;
+            if (ev && (ev.error === 'interrupted' || ev.error === 'canceled')) {
+                finalizar(false);
+                return;
+            }
             finalizar(false);
         };
         window.speechSynthesis.speak(u);
@@ -3420,6 +3671,9 @@ function hablar(texto, clave, alTerminar) {
 function detenerAudio() {
     audioToken++;
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    guiaUtteranceActual = null;
+    guiaPausado = false;
+    document.body.classList.remove('guia-hablando', 'guia-pausado');
     if (audioHablando) {
         audioHablando = false;
         audioClave = null;
@@ -3440,6 +3694,7 @@ function actualizarBotonesAudio() {
             b.textContent = etiquetaAudio(b.dataset.audio);
         }
     });
+    actualizarControlesGuia();
 }
 
 function alternarAudio(clave) {
@@ -3724,17 +3979,20 @@ function renderMapa(c, opciones) {
 let seccionActual = null;
 
 // Separa las fuentes oficiales de las de referencia (prensa / blogs)
-function crearFuentes(lista) {
-    const cont = crear('div');
+function crearFuentes(lista, titulo) {
+    const cont = crear('div', { class: 'fuentes' });
     if (!lista || !lista.length) return cont;
-    cont.appendChild(crear('h3', { texto: 'Fuentes' }));
+    cont.appendChild(crear('h3', { texto: titulo || 'Fuentes' }));
     const ul = crear('ul');
     lista.forEach(function(f) {
-        ul.appendChild(crear('li', { class: 'fuente' },
-            crear('strong', { texto: f.oficial ? '✔ Oficial · ' : 'Referencia (prensa/blog) · ' }),
-            f.autor + ' — ' + f.titulo + ' ',
-            enlace(f.url, f.url, '')
-        ));
+        const item = crear('li', { class: 'fuente' },
+            crear('strong', {
+                texto: (f.etiqueta || (f.oficial ? '✔ Oficial' : 'Referencia (prensa/blog)')) + ' · '
+            }),
+            f.autor + ' — ' + f.titulo + ' '
+        );
+        if (f.url) item.appendChild(enlace(f.url, f.url, ''));
+        ul.appendChild(item);
     });
     cont.appendChild(ul);
     return cont;
@@ -3786,6 +4044,10 @@ function renderHistoria(c) {
     c.appendChild(crear('p', { texto: casco.leyenda }));
     c.appendChild(crear('h3', { texto: casco.tituloExplicacion || 'Significado' }));
     c.appendChild(crear('p', { texto: casco.explicacion }));
+    c.appendChild(crear('h3', { texto: 'La Virgen del Socavón' }));
+    agregarFotoAnimal(c, HISTORIA_VIRGEN);
+    c.appendChild(crear('p', { texto: HISTORIA_VIRGEN.historia }));
+    c.appendChild(crearFuentes(HISTORIA_VIRGEN.fuentes));
     c.appendChild(crear('div', { class: 'fila-botones' },
         botonAudio('casco'),
         boton('🧊 Ver modelo 3D', 'btn-chico', function() { verEnVisor('casco'); })
@@ -3793,6 +4055,373 @@ function renderHistoria(c) {
     c.appendChild(crear('h3', { texto: 'Línea de tiempo' }));
     c.appendChild(crearLineaTiempo());
     c.appendChild(crearFuentes(casco.fuentes));
+}
+
+function renderHistoriaPlaza(c) {
+    c.appendChild(crear('h3', { texto: 'La Plaza del Casco del Minero' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'cascoOruro.jpg',
+        alt: 'Vista panorámica de la Plaza del Casco del Minero en Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'La Plaza del Casco del Minero es uno de los espacios representativos de la ciudad de Oruro. En el centro se encuentra una enorme estructura metálica que representa el casco de protección utilizado por los trabajadores mineros, como homenaje a los hombres y mujeres que dedicaron sus vidas a la actividad minera.',
+        'El monumento fue construido entre los años 2002 y 2003, como símbolo de la identidad minera de Oruro. En su estructura destaca la imagen de la Virgen del Socavón, que representa la fe y devoción de los trabajadores mineros.',
+        'Alrededor de la plaza se encuentran representaciones de los cuatro animales de la leyenda de Huari: el sapo, la víbora, el lagarto y las hormigas. Estas figuras forman parte de la tradición mitológica que explica el origen cultural del Carnaval de Oruro.',
+        'Este lugar también funciona como punto de bienvenida para las personas que ingresan a la ciudad por la zona norte, mostrando parte de su historia, cultura, tradición minera y riqueza folklórica.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crearFuentes([
+        FUENTE_CASCO_2015,
+        {
+            autor: 'Blogs Oruro (autor no indicado)',
+            titulo: 'El Casco del Minero (11/12/2011)',
+            url: 'https://blogsoruro.blogspot.com/2011/12/el-casco-del-minero.html'
+        },
+        {
+            autor: 'La Razón / ABI',
+            titulo: 'Inauguran sala de exposición del Carnaval al interior del monumento al Casco del Minero (14/07/2016)',
+            url: 'https://hemeroteca.larazon.bo/sociedad/2016/07/14/oruro-inauguran-sala-de-exposicion-del-carnaval-al-interior-del-monumento-al-casco-del-minero/'
+        }
+    ], 'Fuentes sobre la Plaza del Casco del Minero'));
+}
+
+function renderHistoriaSerpiente(c) {
+    c.appendChild(crear('h3', { texto: 'La leyenda de la Serpiente' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'serpiente2.jpg',
+        alt: 'Monumento de la serpiente de la leyenda de Huari en Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'Según la leyenda de Huari, la gigantesca serpiente fue la primera de las cuatro plagas enviadas para destruir al pueblo de los Urus. Esta enorme criatura apareció en los alrededores de Oruro, causando miedo y terror entre sus habitantes, porque avanzaba amenazando con devorar todo a su paso.',
+        'Al ver el peligro, la Ñusta, identificada posteriormente con la Virgen del Socavón, acudió para proteger a los Urus. Con su espada enfrentó a la gigantesca serpiente y logró partirla en dos, convirtiéndola en piedra.',
+        'Según la tradición, el cuerpo petrificado de la serpiente se encuentra representado en una formación rocosa conocida como la Víbora de Oruro. Esta leyenda simboliza la protección del pueblo y forma parte de la riqueza mitológica y cultural del Carnaval de Oruro.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    const fuente = crear('p', { class: 'nota' });
+    fuente.appendChild(crear('strong', { texto: 'Fuente cultural · ' }));
+    fuente.appendChild(document.createTextNode('Centro de Ecología y Pueblos Andinos (CEPA) — '));
+    fuente.appendChild(enlace(
+        'El origen del Carnaval de Oruro',
+        'https://cepaoruro.org/no22-el-origen-del-carnaval-de-oruro-20-02-09/',
+        ''
+    ));
+    c.appendChild(fuente);
+}
+
+function renderHistoriaOruro(c) {
+    c.appendChild(crear('h3', { texto: 'Historia de Oruro' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'historiaOruro.jpg',
+        alt: 'Ilustración de la fundación histórica de Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'La historia de Oruro se remonta a tiempos antiguos, cuando la región estaba habitada por los pueblos originarios Urus, quienes desarrollaron sus propias costumbres, tradiciones y formas de vida en el altiplano boliviano.',
+        'La ciudad fue fundada oficialmente el 1 de noviembre de 1606 por el español Manuel de Castro y Padilla, con el nombre de Real Villa de San Felipe de Austria, durante el periodo colonial. Su fundación estuvo relacionada con la riqueza mineral de sus cerros, especialmente los yacimientos de plata.',
+        'Durante la época colonial, Oruro se convirtió en un importante centro minero. Posteriormente, la explotación del estaño también impulsó su crecimiento económico y convirtió a la ciudad en un lugar importante para la actividad minera de Bolivia.',
+        'El 10 de febrero de 1781, Oruro protagonizó una rebelión contra el dominio español, en la que destacó Sebastián Pagador. Este acontecimiento forma parte de la historia de la lucha por la libertad y se recuerda cada año como una fecha cívica departamental.',
+        'Con el paso del tiempo, Oruro también desarrolló una gran riqueza cultural y religiosa. Su celebración más representativa es el Carnaval de Oruro, una festividad dedicada a la Virgen del Socavón, donde participan numerosas fraternidades con danzas tradicionales como la Diablada, la Morenada, los Caporales y los Tobas.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crear('h3', { texto: 'Importancia histórica y cultural' }));
+    c.appendChild(crear('p', {
+        texto: 'Oruro es reconocida por su tradición minera, sus pueblos originarios, sus expresiones folklóricas y sus celebraciones religiosas. Es una ciudad que conserva una historia llena de cultura, esfuerzo y tradiciones que forman parte de la identidad boliviana.'
+    }));
+    c.appendChild(crearFuentes([
+        {
+            autor: 'Instituto Nacional de Estadística (INE)',
+            titulo: 'Aspectos históricos de Bolivia',
+            url: 'https://www.ine.gob.bo/index.php/bolivia/aspectos-historicos/',
+            oficial: true
+        },
+        {
+            autor: 'Banco Central de Bolivia',
+            titulo: 'Boletín informativo N.º 64 — Fundación de Oruro',
+            url: 'https://bibliotecadigital.bcb.gob.bo/xmlui/bitstream/handle/123456789/7700/Bolet%C3%ADn%20Informativo%20N%C2%B0%2064%20-%20Fundaci%C3%B3n%20de%20Oruro.pdf?isAllowed=y&sequence=1',
+            oficial: true
+        },
+        {
+            autor: 'Centro de Ecología y Pueblos Andinos (CEPA)',
+            titulo: 'El origen de la ciudad de Oruro según fray Martín de Murua (1616)',
+            url: 'https://cepaoruro.org/no1044-el-origen-de-la-ciudad-de-oruro-segun-fray-martin-de-murua-1616/',
+            etiqueta: 'Fuente cultural'
+        },
+        {
+            autor: 'UNESCO',
+            titulo: 'Carnaval de Oruro',
+            url: 'https://ich.unesco.org/es/RL/el-carnaval-de-oruro-00003',
+            oficial: true
+        }
+    ], 'Fuentes sobre la historia de Oruro'));
+}
+
+function renderHistoriaSapo(c) {
+    c.appendChild(crear('h3', { texto: 'La leyenda del Sapo' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'sapo2.jpg',
+        alt: 'Monumento del sapo de la leyenda de Huari en Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'Según la leyenda de Huari, el sapo gigante fue la segunda plaga enviada por Huari para destruir al pueblo de los Urus. La enorme criatura apareció por el norte de Oruro, avanzando lentamente por la planicie con su gigantesca boca abierta y destruyendo los campos con su poderoso aliento.',
+        'Los habitantes, aterrorizados por la presencia del monstruo, pidieron ayuda a la Ñusta, quien apareció para defenderlos. La Ñusta utilizó su honda y lanzó una piedra directamente hacia la boca del gigantesco sapo, logrando vencerlo y convertirlo en piedra.',
+        'Según la tradición, el sapo petrificado se encontraba representado por una enorme formación rocosa al norte de la ciudad de Oruro. Este lugar llegó a ser considerado sagrado por los habitantes, quienes realizaban ofrendas y ceremonias de ch’alla como parte de sus costumbres.',
+        'La figura del sapo también forma parte de la iconografía del Carnaval de Oruro y aparece representada en las máscaras de los danzarines de la Diablada.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crear('h3', { texto: 'Significado cultural' }));
+    c.appendChild(crear('p', {
+        texto: 'El sapo representa la segunda plaga de Huari y simboliza uno de los peligros que amenazaron al antiguo pueblo Uru. Su historia forma parte de la mitología orureña y de las tradiciones que dieron origen a las representaciones del Carnaval de Oruro.'
+    }));
+    c.appendChild(crearFuentes([
+        {
+            autor: 'Archivo de Folklore Boliviano',
+            titulo: 'El sapo de la leyenda de Huari',
+            url: 'https://archivodefolkloreboliviano.org/motivo/sapo-huari/',
+            etiqueta: 'Archivo cultural'
+        },
+        {
+            autor: 'Centro de Ecología y Pueblos Andinos (CEPA)',
+            titulo: 'Cuentos andinos de montaña (2003), p. 104',
+            etiqueta: 'Fuente bibliográfica'
+        },
+        {
+            autor: 'Los Tiempos / ANF',
+            titulo: 'La leyenda de las cuatro plagas es símbolo de la Diablada',
+            url: 'https://www.lostiempos.com/node/619351',
+            etiqueta: 'Fuente periodística'
+        }
+    ], 'Fuentes sobre la leyenda del Sapo'));
+}
+
+function renderHistoriaVirgenMuseo(c) {
+    c.appendChild(crear('h3', { texto: 'La Virgen del Socavón' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'virgenSocavon.jpg',
+        alt: 'Imagen de la Virgen del Socavón en Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'La Virgen del Socavón, también conocida como Virgen de la Candelaria, es la principal figura de devoción religiosa de la ciudad de Oruro, Bolivia. Es considerada protectora de los trabajadores mineros y patrona espiritual del Carnaval de Oruro.',
+        'Según la tradición oral, su historia está relacionada con un personaje conocido como el Nina Nina o Chiru-Chiru, un hombre que vivía en Oruro y que, después de resultar gravemente herido, fue llevado a un socavón minero llamado Pie de Gallo. Allí se encontraba una imagen de la Virgen María, ante la cual habría recibido protección.',
+        'Con el paso del tiempo, los mineros comenzaron a venerar a la Virgen, pidiendo su protección frente a los peligros que enfrentaban en las profundidades de las minas. Su devoción creció entre los habitantes de Oruro y se convirtió en una de las expresiones religiosas más importantes de la región.',
+        'Actualmente, miles de bailarines y devotos participan en el Carnaval de Oruro realizando una peregrinación hasta el Santuario de la Virgen del Socavón. Los danzarines ofrecen sus bailes como muestra de fe, agradecimiento y promesa a la Virgen.',
+        'La Virgen del Socavón representa la fe, la esperanza, la protección y la unión entre las tradiciones andinas y la religión católica.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crearFuentes([
+        FUENTE_UNESCO_2008,
+        FUENTE_ABI_VIRGEN,
+        {
+            autor: 'Centro de Ecología y Pueblos Andinos (CEPA)',
+            titulo: 'Raíces y ramas del Carnaval de Oruro',
+            url: 'https://cepaoruro.org/raices-y-ramas-del-carnaval-de-oruro-18-02-10-2/',
+            etiqueta: 'Fuente cultural'
+        }
+    ], 'Fuentes sobre la Virgen del Socavón'));
+}
+
+function renderHistoriaLagarto(c) {
+    c.appendChild(crear('h3', { texto: 'La leyenda del Lagarto' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'lagartoOruro.jpg',
+        alt: 'Monumento del lagarto de la leyenda de Huari en Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'Según la leyenda de Huari, el lagarto gigante fue la tercera plaga enviada por Huari para destruir al antiguo pueblo de los Urus. Esta enorme criatura apareció por el sector este de Oruro, procedente de las regiones de Japu y Murucucala. Con su gigantesca cola golpeaba los montes y destruía todo lo que encontraba a su paso.',
+        'Al ver el peligro, los habitantes pidieron nuevamente ayuda a la Ñusta, identificada posteriormente con la Virgen del Socavón. Ella salió al encuentro del monstruoso animal y, utilizando su espada, logró separar su cabeza de su cuerpo, derrotándolo y convirtiéndolo en piedra.',
+        'Según la tradición, la sangre del lagarto formó la laguna de Cala Cala, mientras que su cuerpo quedó petrificado en los cerros de esa región. Su cabeza también quedó asociada a una formación rocosa del lugar.',
+        'Esta historia forma parte de la mitología de Oruro y representa la protección de la Ñusta hacia el pueblo Uru.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crear('h3', { texto: 'Significado cultural' }));
+    c.appendChild(crear('p', {
+        texto: 'El lagarto representa la tercera plaga de Huari. Su figura forma parte de las representaciones mitológicas del Carnaval de Oruro y aparece en los símbolos y vestimentas de los danzarines de la Diablada.'
+    }));
+    c.appendChild(crearFuentes([
+        {
+            autor: 'Archivo de Folklore Boliviano',
+            titulo: 'Lagarto de Cala Cala',
+            url: 'https://archivodefolkloreboliviano.org/motivo/lagarto-de-cala-cala/',
+            etiqueta: 'Archivo cultural'
+        },
+        {
+            autor: 'Vicente Terán Erquicia',
+            titulo: 'Chiwanwayus y achankaras: flores de leyendas qeswas (1969)',
+            etiqueta: 'Fuente bibliográfica'
+        },
+        {
+            autor: 'Los Tiempos / ANF',
+            titulo: 'La leyenda de las cuatro plagas es símbolo de la Diablada (2023)',
+            url: 'https://www.lostiempos.com/node/619351',
+            etiqueta: 'Fuente periodística'
+        },
+        {
+            autor: 'Bolivia en tus manos',
+            titulo: 'Sitios mitológicos de Oruro',
+            url: 'https://www.boliviaentusmanos.com/turismo/atractivos/sitios-mitologicos.html',
+            etiqueta: 'Información turística'
+        }
+    ], 'Fuentes sobre la leyenda del Lagarto'));
+}
+
+function renderHistoriaDiablada(c) {
+    c.appendChild(crear('h3', { texto: 'La Diablada de Oruro' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'diabladaOruro.jpg',
+        alt: 'Danzarina de la Diablada en el Carnaval de Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'La Diablada es una de las danzas más representativas del Carnaval de Oruro. Su historia está relacionada con las antiguas tradiciones de los pueblos andinos, la actividad minera y la religión católica.',
+        'Según la tradición mitológica, su historia se relaciona con el dios Huari, quien envió cuatro plagas para castigar al pueblo de los Urus. La Ñusta, identificada posteriormente con la Virgen del Socavón, protegió a los habitantes y venció las amenazas.',
+        'Con la llegada de los españoles, las antiguas ceremonias andinas se mezclaron con las representaciones religiosas cristianas. De esta unión surgió una representación de la lucha entre el bien y el mal, que con el tiempo se convirtió en la danza de la Diablada.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crear('h4', { texto: 'Personajes de la danza' }));
+    const personajes = crear('ul');
+    [
+        ['Lucifer', 'representa al principal jefe de los diablos.'],
+        ['Satanás', 'representa las fuerzas del mal.'],
+        ['China Supay', 'representa una figura femenina del mundo diabólico.'],
+        ['Diablos', 'acompañan a Lucifer y Satanás.'],
+        ['Arcángel San Miguel', 'representa la lucha del bien contra el mal.'],
+        ['La Virgen del Socavón', 'representa la protección y la victoria del bien.']
+    ].forEach(function(personaje) {
+        personajes.appendChild(crear('li', null,
+            crear('strong', { texto: personaje[0] + ': ' }),
+            personaje[1]
+        ));
+    });
+    c.appendChild(personajes);
+
+    c.appendChild(crear('p', {
+        texto: 'Los bailarines utilizan máscaras con cuernos, ojos grandes y colores llamativos, además de trajes bordados con figuras de dragones, serpientes y otros elementos fantásticos.'
+    }));
+    c.appendChild(crear('p', {
+        texto: 'La Diablada se baila en honor a la Virgen del Socavón. Los danzarines realizan una peregrinación hasta su santuario como muestra de fe, promesa y agradecimiento.'
+    }));
+    c.appendChild(crear('h3', { texto: 'Importancia cultural' }));
+    c.appendChild(crear('p', {
+        texto: 'La Diablada es una expresión de la identidad cultural de Oruro y forma parte del Carnaval reconocido por la UNESCO como Patrimonio Cultural Inmaterial de la Humanidad en 2008.'
+    }));
+    c.appendChild(crearFuentes([
+        {
+            autor: 'UNESCO',
+            titulo: 'Carnaval de Oruro — Patrimonio Cultural Inmaterial',
+            url: 'https://ich.unesco.org/es/RL/carnaval-de-oruro-00003',
+            oficial: true
+        },
+        {
+            autor: 'Archivo de Folklore Boliviano',
+            titulo: 'La Diablada',
+            url: 'https://archivodefolkloreboliviano.org/motivo/diablada/',
+            etiqueta: 'Archivo cultural'
+        },
+        {
+            autor: 'La Patria',
+            titulo: 'Historia de la Diablada de Oruro',
+            url: 'https://lapatria.bo/cultura-viva/arte/comite-de-etnografia-y-folklore-solo-en-oruro-existe-la-danza-de-la-diablada/',
+            etiqueta: 'Fuente histórica'
+        },
+        {
+            autor: 'SciELO Bolivia',
+            titulo: 'El Tío, Dios de los mineros bolivianos',
+            url: 'https://www.scielo.org.bo/scielo.php?pid=S2519-53522024000100003&script=sci_arttext',
+            etiqueta: 'Investigación académica'
+        }
+    ], 'Fuentes sobre la Diablada'));
+}
+
+function renderHistoriaHormigas(c) {
+    c.appendChild(crear('h3', { texto: 'La leyenda de las Hormigas' }));
+    const foto = crear('img', {
+        class: 'foto',
+        src: 'hormigaOruro.jpg',
+        alt: 'Monumento de las hormigas de la leyenda de Huari en Oruro',
+        loading: 'lazy'
+    });
+    foto.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:10px;';
+    c.appendChild(foto);
+
+    [
+        'Según la leyenda de Huari, las hormigas gigantes fueron la cuarta y última plaga enviada por Huari para destruir al antiguo pueblo de los Urus. Después de que la Ñusta venciera al lagarto, Huari hizo salir millones de hormigas de la boca de la criatura muerta, cerca de la laguna de Cala Cala.',
+        'Las hormigas avanzaron como un enorme ejército por las planicies del este de Oruro, cerca del río Tagarete, amenazando con cubrir y destruir el pueblo de los Urus.',
+        'Al observar el peligro, la Ñusta volvió a enfrentarse a la plaga. Utilizando su honda, lanzó piedras contra el enorme hormiguero y logró detener su avance. Según la narración, las hormigas fueron transformadas en pequeños montículos de arena.',
+        'La tradición cuenta que estos montículos dieron origen a los grandes arenales de Oruro, que forman parte del paisaje característico de la región.'
+    ].forEach(function(parrafo) {
+        c.appendChild(crear('p', { texto: parrafo }));
+    });
+
+    c.appendChild(crear('h3', { texto: 'Significado cultural' }));
+    c.appendChild(crear('p', {
+        texto: 'Las hormigas representan la cuarta plaga de Huari y simbolizan el último intento de destruir al pueblo Uru. Su historia forma parte de las cuatro plagas representadas en la mitología del Carnaval de Oruro.'
+    }));
+    c.appendChild(crearFuentes([
+        {
+            autor: 'Archivo de Folklore Boliviano',
+            titulo: 'Las hormigas de Oruro',
+            url: 'https://archivodefolkloreboliviano.org/motivo/hormigas/',
+            etiqueta: 'Archivo cultural'
+        },
+        {
+            autor: 'Alberto Guerra Gutiérrez',
+            titulo: 'Antología del Carnaval de Oruro, Tomo II (1970)',
+            url: 'https://archivodefolkloreboliviano.org/wp-content/uploads/2021/05/Antologia_del_Carnaval_de_Oruro_Tomo_II_Alberto_Guerra_Gutierrez.pdf',
+            etiqueta: 'Fuente bibliográfica'
+        },
+        {
+            autor: 'Centro de Ecología y Pueblos Andinos (CEPA)',
+            titulo: 'El origen del Carnaval de Oruro',
+            url: 'https://cepaoruro.org/no22-el-origen-del-carnaval-de-oruro-20-02-09/',
+            etiqueta: 'Fuente cultural'
+        }
+    ], 'Fuentes sobre la leyenda de las Hormigas'));
 }
 
 function renderMonumentos(c) {
@@ -3998,6 +4627,14 @@ function renderDescubrimientos(c) {
 
 const SECCIONES = {
     historia:        { titulo: 'Historia',               icono: '📜', render: renderHistoria,        claves: 'casco minero origen significado virgen socavon' },
+    historiaPlaza:   { titulo: 'Historia de la Plaza',   icono: '📜', render: renderHistoriaPlaza,   claves: 'plaza casco minero oruro monumento mineria' },
+    historiaSerpiente: { titulo: 'La leyenda de la Serpiente', icono: '🐍', render: renderHistoriaSerpiente, claves: 'serpiente vibora huari ñusta urus carnaval oruro' },
+    historiaOruro:   { titulo: 'Historia de Oruro',      icono: '🏛️', render: renderHistoriaOruro,   claves: 'oruro historia fundacion mineria carnaval' },
+    historiaSapo:    { titulo: 'La leyenda del Sapo',    icono: '🐸', render: renderHistoriaSapo,    claves: 'sapo huari urus ñusta carnaval oruro' },
+    historiaVirgen:  { titulo: 'Virgen del Socavón',     icono: '🙏', render: renderHistoriaVirgenMuseo, claves: 'virgen socavon candelaria nina nina chiru carnaval' },
+    historiaLagarto: { titulo: 'La leyenda del Lagarto', icono: '🦎', render: renderHistoriaLagarto, claves: 'lagarto cala cala huari ñusta urus carnaval oruro' },
+    historiaDiablada: { titulo: 'La Diablada',           icono: '💃', render: renderHistoriaDiablada, claves: 'diablada carnaval huari ñusta virgen oruro danza' },
+    historiaHormigas: { titulo: 'La leyenda de las Hormigas', icono: '🐜', render: renderHistoriaHormigas, claves: 'hormigas huari urus ñusta carnaval arenales oruro' },
     monumentos:      { titulo: 'Monumentos',             icono: '🗿', render: renderMonumentos,      claves: 'casco del minero escultura plaza ubicacion' },
     cultura:         { titulo: 'Cultura',                icono: '🎭', render: renderCultura,         claves: 'carnaval diablada leyenda plagas nusta huari unesco oruro' },
     animales:        { titulo: 'Animales',               icono: '🐍', render: renderAnimales,        claves: 'plagas hormiga serpiente sapo lagarto' },
@@ -4295,7 +4932,7 @@ function terminarTour(volverAlPersonaje) {
     if (!tourActivo) return;
     tourActivo = false;
     detenerAudio();
-    lugarForzado = null;
+    lugarForzado = (typeof dentroMuseo !== 'undefined' && dentroMuseo) ? MUSEO.nombre : null;
     document.body.classList.remove('en-tour');
     const card = porId('tourCard');
     card.classList.remove('abierto');
@@ -4373,6 +5010,7 @@ function mostrarAyudaInicial() {
 function alIniciarExploracion() {
     document.body.classList.add('explorando');
     actualizarIndicadorExploracion();
+    hablar('¡Bienvenido al Casco del Minero! Soy tu guía. Acompáñame a explorar esta plaza. Cuando te acerques a una figura, te contaré su historia y su leyenda.', 'bienvenida');
     setTimeout(function() { mostrarToast('Bienvenido a Oruro · abre EXPLORAR para conocer el lugar'); }, 700);
 }
 
@@ -4424,6 +5062,7 @@ function iniciarInterfazTurismo() {
 
     porId('btnCerrarSeccion').addEventListener('click', function() { cerrarSeccion(); });
     configurarBuscador();
+    configurarControlesGuia();
 
     // --- Barra superior ---
     porId('btnUbicacion').addEventListener('click', function(e) { alternarSeccion('mapa'); e.currentTarget.blur(); });
@@ -4486,6 +5125,280 @@ function iniciarInterfazTurismo() {
 
     actualizarIndicadorExploracion();
 }
+
+
+// ======================================
+// MUSEO DEL CASCO (entrada en X 2.65, Z 1.81)
+// ======================================
+// Al acercarte a la coordenada de "entrada" aparece el aviso "Entrar al museo".
+// El modelo se descarga de tu repositorio de GitHub (versión raw.githubusercontent.com).
+
+const MUSEO = {
+    nombre: 'Museo del Casco del Minero',
+    archivos: ['museo.glb'],                 // CAMBIA por el nombre real del modelo en tu repositorio
+    entrada: { x: 2.65, y: 2.42, z: 1.81, radio: 1.5 },
+    origen: { x: 200, z: 0 },                // el museo se coloca lejos del mapa
+    anchoDeseado: 8,                         // tamaño del museo; súbelo o bájalo a tu gusto
+    puntosAzules: [
+        { x: 202.01, y: 0.29, z: 1.41, historia: 'historiaHormigas' },
+        { x: 199.68, y: 0.29, z: 1.94, historia: 'historiaDiablada' },
+        { x: 197.22, y: 0.29, z: 1.93, historia: 'historiaLagarto' },
+        { x: 196.36, y: 0.29, z: -0.12, historia: 'historiaVirgen' },
+        { x: 197.63, y: 0.29, z: -2.17, historia: 'historiaSapo' },
+        { x: 200.55, y: 0.29, z: -2.21, historia: 'historiaOruro' },
+        { x: 202.95, y: 0.29, z: -1.92, historia: 'historiaSerpiente' },
+        { x: 203.69, y: 0.29, z: -0.04, historia: 'historiaPlaza' }
+    ]
+};
+
+let museoModelo = null;
+let museoCargando = false;
+let dentroMuseo = false;
+let museoSpawn = null;
+let estadoAvisoMuseo = '';
+const puntosAzulesMuseo = [];
+const museoRetorno = new THREE.Vector3();
+
+function crearPuntoAzulMuseo() {
+    if (puntosAzulesMuseo.length) return;
+
+    const geometria = new THREE.CircleGeometry(0.2, 32);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x00a5ff,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+        depthTest: false
+    });
+
+    MUSEO.puntosAzules.forEach(function(punto) {
+        const marcador = new THREE.Mesh(geometria, material);
+        marcador.rotation.x = -Math.PI / 2;
+        marcador.position.set(punto.x, punto.y, punto.z);
+        marcador.renderOrder = 999;
+        marcador.visible = false;
+        escena.add(marcador);
+        puntosAzulesMuseo.push(marcador);
+    });
+}
+
+function crearAvisoMuseo() {
+    const estilo = document.createElement('style');
+    estilo.textContent =
+        '#avisoMuseo{position:fixed;left:50%;bottom:calc(130px + env(safe-area-inset-bottom,0px));' +
+        'transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:14px;' +
+        'padding:12px 20px;background:rgba(5,18,30,.86);border:1px solid #d6a63b;border-radius:14px;' +
+        'color:#fff;font:600 15px Poppins,sans-serif;box-shadow:0 0 20px #d6a63b55;' +
+        '-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);}' +
+        '#avisoMuseo .tecla{min-width:40px;height:40px;display:grid;place-items:center;padding:0 8px;' +
+        'background:#d6a63b;color:#101b25;border-radius:8px;font-weight:800;font-size:15px;cursor:pointer;}' +
+        '#avisoMuseo small{display:block;color:#b8c4cc;font-weight:400;font-size:11px;}' +
+        'body.modo-foto #avisoMuseo,body.en-tour #avisoMuseo{display:none!important;}';
+    document.head.appendChild(estilo);
+
+    const aviso = document.createElement('div');
+    aviso.id = 'avisoMuseo';
+    aviso.innerHTML =
+        '<span class="tecla" id="museoTecla">Enter</span>' +
+        '<div><span id="museoTitulo"></span><small id="museoSub"></small></div>';
+    document.body.appendChild(aviso);
+
+    document.getElementById('museoTecla').addEventListener('click', function() {
+        const punto = puntoHistoriaCercanoMuseo();
+        if (estadoAvisoMuseo === 'historia' && punto) abrirContenidoPuntoMuseo(punto);
+        else alternarMuseo();
+    });
+}
+
+async function cargarMuseo() {
+    if (museoModelo) return museoModelo;
+    if (museoCargando) return null;
+    museoCargando = true;
+    mostrarToast('⏳ Cargando el museo…');
+
+    let gltf = null;
+    const bases = [CARPETA_LOCAL, ...REPOS];
+    buscar:
+    for (const base of bases) {
+        for (const archivo of MUSEO.archivos) {
+            try {
+                gltf = await loader.loadAsync(base + archivo);
+                console.log('Museo cargado desde:', base + archivo);
+                break buscar;
+            } catch (e) { /* prueba la siguiente ruta */ }
+        }
+    }
+    museoCargando = false;
+
+    if (!gltf) {
+        mostrarToast('No se pudo cargar el museo. Revisa el nombre del archivo en MUSEO.archivos.', 'aviso');
+        return null;
+    }
+
+    const obj = gltf.scene;
+    const caja = new THREE.Box3().setFromObject(obj);
+    const tam = caja.getSize(new THREE.Vector3());
+    obj.scale.setScalar(MUSEO.anchoDeseado / (Math.max(tam.x, tam.z) || 1));
+    obj.updateMatrixWorld(true);
+
+    const caja2 = new THREE.Box3().setFromObject(obj);
+    const centro = caja2.getCenter(new THREE.Vector3());
+    obj.position.set(MUSEO.origen.x - centro.x, -caja2.min.y, MUSEO.origen.z - centro.z);
+    escena.add(obj);
+    obj.updateMatrixWorld(true);
+
+    let lucesMuseo = 0;
+    obj.traverse(function(o) {
+        if (o.isLight) {
+            o.visible = true;
+            lucesMuseo++;
+            return;
+        }
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.receiveShadow = true;
+        [].concat(o.material).forEach(function(m) { if (m) { m.side = THREE.DoubleSide; m.needsUpdate = true; } });
+        if (!o.geometry.boundsTree) o.geometry.computeBoundsTree();
+        objetosColision.push(o);
+    });
+    console.log('Museo: luces propias del modelo conservadas =', lucesMuseo);
+
+    crearPuntoAzulMuseo();
+    limitarTexturas(obj, CFG.texturaMax);
+    limitesMapa.expandByObject(obj);
+
+    // Punto de aparición dentro del museo: se busca el piso desde poca altura
+    const cajaFinal = new THREE.Box3().setFromObject(obj);
+    const alto = cajaFinal.max.y - cajaFinal.min.y;
+    const hit = golpeSuelo(MUSEO.origen.x, cajaFinal.min.y + Math.min(alto * 0.4, 2),
+        MUSEO.origen.z, alto + 5);
+    museoSpawn = new THREE.Vector3(MUSEO.origen.x, (hit ? hit.point.y : cajaFinal.min.y) + 0.05, MUSEO.origen.z);
+
+    museoModelo = obj;
+    return obj;
+}
+
+async function entrarMuseo() {
+    if (dentroMuseo || !puedeControlar()) return;
+    const modelo = await cargarMuseo();
+    if (!modelo || !museoSpawn) return;
+
+    if (vistaFija) elegirVista('Digit0');
+    museoRetorno.copy(jugador.position);
+    jugador.position.copy(museoSpawn);
+    vx = vy = vz = 0;
+    enSuelo = false;
+    dentroMuseo = true;
+    document.body.classList.add('dentro-museo');
+    puntosAzulesMuseo.forEach(function(punto) { punto.visible = true; });
+    lugarForzado = MUSEO.nombre;
+    actualizarCamara(0, true);
+    mostrarToast('🏛️ Bienvenido al museo · camina para explorar · X para salir');
+}
+
+function salirMuseo() {
+    if (!dentroMuseo) return;
+    jugador.position.copy(museoRetorno);
+    vx = vy = vz = 0;
+    enSuelo = false;
+    dentroMuseo = false;
+    document.body.classList.remove('dentro-museo');
+    puntosAzulesMuseo.forEach(function(punto) { punto.visible = false; });
+    lugarForzado = null;
+    actualizarCamara(0, true);
+}
+
+function alternarMuseo() {
+    if (dentroMuseo) salirMuseo(); else entrarMuseo();
+}
+
+function cercaDeEntradaMuseo() {
+    if (!jugador || dentroMuseo) return false;
+    const E = MUSEO.entrada;
+    return Math.hypot(jugador.position.x - E.x, jugador.position.z - E.z) < E.radio &&
+        Math.abs(jugador.position.y - E.y) < 3;
+}
+
+function puntoHistoriaCercanoMuseo() {
+    if (!jugador || !dentroMuseo) return null;
+    for (const punto of MUSEO.puntosAzules) {
+        if (Math.hypot(jugador.position.x - punto.x, jugador.position.z - punto.z) < 0.65 &&
+            Math.abs(jugador.position.y - punto.y) < 1.5) return punto;
+    }
+    return null;
+}
+
+function puntoAzulMuseoBajoCursor(evento) {
+    const rect = renderizador.domElement.getBoundingClientRect();
+    const x = evento.clientX;
+    const y = evento.clientY;
+    let cercano = null;
+    let distanciaCercana = 24;
+
+    puntosAzulesMuseo.forEach(function(marcador, indice) {
+        if (!marcador.visible) return;
+        const posicion = marcador.position.clone().project(camara);
+        if (posicion.z < -1 || posicion.z > 1) return;
+
+        const px = rect.left + (posicion.x + 1) * rect.width / 2;
+        const py = rect.top + (1 - posicion.y) * rect.height / 2;
+        const distancia = Math.hypot(x - px, y - py);
+        if (distancia < distanciaCercana) {
+            cercano = MUSEO.puntosAzules[indice];
+            distanciaCercana = distancia;
+        }
+    });
+
+    return cercano;
+}
+
+function abrirContenidoPuntoMuseo(punto) {
+    const historia = punto.historia || 'historiaPlaza';
+    abrirSeccion(historia);
+
+    const contenido = porId('seccionCuerpo').cloneNode(true);
+    contenido.querySelectorAll('.fuentes, .fila-botones, img, iframe').forEach(function(elemento) {
+        elemento.remove();
+    });
+    const texto = contenido.textContent.replace(/\s+/g, ' ').trim();
+    if (texto) hablar(texto, 'museo-' + historia);
+}
+
+function actualizarMuseo() {
+    const aviso = document.getElementById('avisoMuseo');
+    if (!aviso) return;
+
+    let estado = 'oculto';
+    if (jugador && puedeControlar()) {
+        if (dentroMuseo) estado = puntoHistoriaCercanoMuseo() ? 'historia' : 'salir';
+        else if (cercaDeEntradaMuseo()) estado = 'entrar';
+    }
+    if (estado === estadoAvisoMuseo) return;
+    estadoAvisoMuseo = estado;
+
+    if (estado === 'oculto') { aviso.style.display = 'none'; return; }
+    const tecla = document.getElementById('museoTecla');
+    tecla.textContent = estado === 'salir' ? 'X' : 'Enter';
+    document.getElementById('museoTitulo').textContent = estado === 'entrar'
+        ? 'Entrar al ' + MUSEO.nombre
+        : estado === 'historia' ? 'Ver la historia' : 'Salir del museo';
+    document.getElementById('museoSub').textContent = estado === 'historia'
+        ? 'Presiona Enter o haz clic'
+        : 'Presiona la tecla o haz clic';
+    aviso.style.display = 'flex';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.repeat) return;
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.code === 'Enter' && puedeControlar()) {
+        const punto = puntoHistoriaCercanoMuseo();
+        if (punto) abrirContenidoPuntoMuseo(punto);
+        else if (cercaDeEntradaMuseo()) entrarMuseo();
+    }
+    else if (e.code === 'KeyX' && dentroMuseo && puedeControlar()) { salirMuseo(); }
+});
+
+crearAvisoMuseo();
 
 
 iniciarEscena();
